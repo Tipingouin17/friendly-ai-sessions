@@ -32,7 +32,7 @@ interface MessagingAreaProps {
   // Add props needed for input functionality
   inputMessage?: string;
   setInputMessage?: (message: string) => void;
-  onSendMessage?: () => void;
+  onSendMessage?: (messageOverride?: string) => Promise<void>;
   isRecording?: boolean;
   setIsRecording?: (isRecording: boolean) => void;
   isAnonymous?: boolean;
@@ -79,7 +79,7 @@ const MessagingArea = ({
   // Input props with defaults
   inputMessage = '',
   setInputMessage = () => { /* no-op */ },
-  onSendMessage = () => { /* no-op */ },
+  onSendMessage = async () => { /* no-op */ },
   isRecording = false,
   setIsRecording = () => { /* no-op */ },
   isAnonymous = false,

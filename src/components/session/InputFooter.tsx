@@ -75,7 +75,7 @@ interface InputFooterProps {
   speechEnabled?: boolean;
   speechLanguage?: string;
   onSpeechInterim?: (payload: { transcript: string; confidence: number | null }) => void;
-  onSpeechFinal?: (payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
+  onSpeechFinal?: (payload: { transcript: string; message: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
   placeholder?: string;
   disabledPlaceholder?: string;
   disabled?: boolean;

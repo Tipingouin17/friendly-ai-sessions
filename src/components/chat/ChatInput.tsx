@@ -26,7 +26,7 @@ interface ChatInputProps {
   speechEnabled?: boolean;
   speechLanguage?: string;
   onSpeechInterim?: (payload: { transcript: string; confidence: number | null }) => void;
-  onSpeechFinal?: (payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
+  onSpeechFinal?: (payload: { transcript: string; message: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => void;
 }
 
 const ChatInput = ({
@@ -122,8 +122,16 @@ const ChatInput = ({
         const durationMs = recordingStartedMsRef.current !== null
           ? Math.round(performance.now() - recordingStartedMsRef.current)
           : null;
+        // Snapshot the exact final composer value before clearing recognition refs.
+        // Parents must persist this explicit value rather than read React state,
+        // which may still contain an interim transcription on mobile browsers.
+        const finalizedMessage = (preRecordingTextRef.current
+          ? `${preRecordingTextRef.current.trimEnd()} ${finalTranscript}`
+          : finalTranscript
+        ).trim().slice(0, MAX_MESSAGE_LENGTH);
         onSpeechFinal?.({
           transcript: finalTranscript,
+          message: finalizedMessage,
           confidence: latestConfidenceRef.current,
           startedAt: recordingStartedAtRef.current,
           endedAt,

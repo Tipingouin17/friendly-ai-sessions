@@ -357,6 +357,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                   <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Next facilitation move</p>
                     <h2 className="mt-1 font-display text-lg font-bold leading-snug tracking-tight text-slate-950">Guide the room from one clear command surface.</h2>
+                    <p className="mt-1.5 text-xs leading-4 text-slate-600">Welcome messages and participant replies run automatically. Use the action below only when you want to intervene with the next facilitation turn.</p>
                     <div className="mt-2.5 flex flex-wrap gap-1.5 text-xs">
                       <span className="session-chip border-indigo-200 bg-white/80 text-indigo-700">{activeModeDefinition?.display_name || 'Open Discussion'}</span>
                       <span className="session-chip border-slate-200 bg-white/80 text-slate-600">TTS: {facilitatorVoiceLabel}</span>
@@ -371,7 +372,7 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
                       disabled={isContinueDisabled}
                       className="h-9 w-full rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-sm shadow-indigo-100 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {(isSending || isGeneratingResponse || isContinuationPending) ? 'Generating…' : isPostGenerationCooldown ? 'Facilitator updated' : 'Generate next turn'}
+                      {(isSending || isGeneratingResponse || isContinuationPending) ? 'Generating…' : isPostGenerationCooldown ? 'Facilitator updated' : 'Ask facilitator for next turn'}
                     </Button>
                   )}
                   <div className="rounded-xl border border-slate-200 bg-white/75 px-3 py-2">

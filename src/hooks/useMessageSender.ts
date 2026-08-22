@@ -120,7 +120,7 @@ export const useMessageSender = ({
     }
   }, [totalParticipants, startNewResponseCollection]);
 
-  const handleSendMessage = useCallback(async () => {
+  const handleSendMessage = useCallback(async (messageOverride?: string) => {
     // Enhanced validation with detailed logging
 
     // Prevent duplicate sends
@@ -154,7 +154,7 @@ export const useMessageSender = ({
     // Don't send empty messages. Snapshot the draft before any async work so
     // late speech-recognition events or network latency cannot keep the old
     // answer visible in the participant composer.
-    const sentMessage = sessionState.inputMessage.trim();
+    const sentMessage = (messageOverride ?? sessionState.inputMessage).trim();
     if (!sentMessage) {
       return;
     }
@@ -175,7 +175,9 @@ export const useMessageSender = ({
       });
 
       // Clear the composer immediately after the participant sends. If the
-      // save fails, the catch block restores the draft so no answer is lost.
+      // save fails, the catch block restores the exact submitted draft so no
+      // answer is lost. Voice passes an explicit final snapshot here because a
+      // browser recognition callback can precede the next React state commit.
       sessionState.setInputMessage("");
 
       // Save user message

@@ -61,7 +61,7 @@ export interface SessionContextProps {
   participantColors: { [key: string]: string };
   isWaitingForResponse: boolean;
   handleStartSession: () => void;
-  handleSendMessage: () => Promise<void>;
+  handleSendMessage: (messageOverride?: string) => Promise<void>;
   showQrCodeView: boolean;
   sessionLink: string;
   currentUserParticipantId: number | null;

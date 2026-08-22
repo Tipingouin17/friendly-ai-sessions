@@ -83,12 +83,16 @@ const getPeerTileConnectionStatus = (peerStatus: WebRTCPeerStatus | undefined, h
 };
 
 const formatPeerTileStatusLabel = (status: TileConnectionStatus): string => {
-  if (status === 'connected') return 'Live video';
+  if (status === 'connected') return 'Video linked — camera is off';
   if (status === 'failed') return 'Reconnect needed';
   if (status === 'disconnected') return 'Reconnecting';
   if (status === 'unsupported') return 'Unsupported';
   if (status === 'idle') return 'Camera off';
   return 'Connecting';
+};
+
+const hasLiveVideoFrames = (stream: MediaStream | null | undefined): boolean => {
+  return Boolean(stream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
 };
 
 const formatParticipantInitials = (participant: ParticipantInfo): string => {
@@ -243,7 +247,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     localStream: hostCameraStream,
     enabled: shouldEnableHostVideoRoom,
   });
-  const remoteVideoCount = Object.values(remoteStreams).filter(Boolean).length;
+  const remoteVideoCount = Object.values(remoteStreams).filter((stream) => hasLiveVideoFrames(stream)).length;
   const videoRoomStatusLabel = !shouldEnableHostVideoRoom
     ? 'Video room ended'
     : remoteVideoCount > 0
@@ -337,8 +341,9 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     },
     ...participants.map((participant) => {
       const remoteStream = remoteStreams[String(participant.id)] ?? null;
+      const hasLiveParticipantVideo = hasLiveVideoFrames(remoteStream);
       const peerStatus = peerStatuses[`participant-${participant.id}`];
-      const tileConnectionStatus = getPeerTileConnectionStatus(peerStatus, Boolean(remoteStream));
+      const tileConnectionStatus = getPeerTileConnectionStatus(peerStatus, hasLiveParticipantVideo);
 
       return {
         id: String(participant.id),
@@ -351,7 +356,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
         isMuted: true,
         hasResponded: respondedParticipantIds.has(String(participant.id)),
         connectionStatus: tileConnectionStatus,
-        connectionStatusLabel: remoteStream
+        connectionStatusLabel: hasLiveParticipantVideo
           ? 'Live video'
           : tileConnectionStatus === 'connected'
             ? 'Video linked — participant camera is off'

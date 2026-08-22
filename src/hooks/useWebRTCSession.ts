@@ -6,11 +6,12 @@
  * presence channels, so signaling is encoded as short-lived `session_events`
  * rows with `event_type = 'webrtc_signal'`.
  *
- * Participants publish their local camera stream by creating one peer
- * connection per viewer (host + other participants). Viewers answer incoming
- * offers and keep the received MediaStreams in a participant-id keyed map for
- * the video grid. Hosts are receive-only for now; participants can both publish
- * their own camera and receive peer participant cameras.
+ * Participants create the offer to the host and publish their local camera
+ * stream. The host answers those offers and can publish its local camera stream
+ * in the same negotiated peer connection. Viewers keep received MediaStreams in
+ * a participant-id keyed map for the video grid. When a local stream changes,
+ * the non-offerer signals camera readiness so the designated offerer renegotiates
+ * without SDP glare.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -728,10 +729,18 @@ export function useWebRTCSession({
     localStreamRef.current = localStream;
     peersRef.current.forEach((record, peerId) => {
       void syncLocalStreamToPeer(record, localStream).then(() => {
-        if (isLocalOffererForPeer(peerId)) schedulePeerRenegotiation(peerId);
+        if (isLocalOffererForPeer(peerId)) {
+          schedulePeerRenegotiation(peerId);
+          return;
+        }
+        // The host deliberately is not the SDP offerer for a participant peer.
+        // When the host turns its camera on after the original negotiation, tell
+        // the participant offerer to create a fresh offer so the host track is
+        // included in the answer and Android can receive actual camera frames.
+        void sendSignal(peerId, { signalType: 'camera-ready' });
       });
     });
-  }, [isLocalOffererForPeer, localStream, schedulePeerRenegotiation, syncLocalStreamToPeer]);
+  }, [isLocalOffererForPeer, localStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer]);
 
   const createOffer = useCallback(async (peerId: string, options: PeerNegotiationOptions = {}) => {
     if (!isLocalOffererForPeer(peerId)) return;

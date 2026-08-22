@@ -22,7 +22,7 @@ interface SessionContainerProps {
   inputMessage: string;
   setInputMessage: (message: string) => void;
   currentParticipant: number;
-  handleSendMessage: () => void; // renamed from onSendMessage for clarity
+  handleSendMessage: (messageOverride?: string) => Promise<void>; // renamed from onSendMessage for clarity
   onGenerateReport: () => void;
   isGeneratingReport: boolean;
   isWaitingForResponse: boolean;

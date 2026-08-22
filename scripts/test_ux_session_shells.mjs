@@ -128,7 +128,7 @@ assertContains(hostContent, 'Panel defaultSize={26} minSize={22} maxSize={34}', 
 assertContains(hostContent, 'facilitatorVoiceGender={facilitatorVoiceGender}', 'host passes facilitator voice gender into the command surface');
 assertContains(hostContent, 'Facilitator voice', 'host session pulse includes facilitator voice context for TTS QA');
 assertContains(hostMessagingView, 'Next facilitation move', 'host overview promotes a single action-first command surface');
-assertContains(hostMessagingView, 'Generate next turn', 'host command center makes the primary next action visible without scrolling');
+assertContains(hostMessagingView, 'Ask facilitator for next turn', 'host command center makes the optional next-turn intervention visible without implying automatic flow needs a manual action');
 assertContains(hostMessagingView, 'AI capabilities', 'host overview compresses secondary toolbox information into a quiet capability summary');
 assertContains(hostMessagingView, 'Quiet context only; the host does not need to manage these during the live flow.', 'host overview reduces explanatory density for secondary capability context');
 assertContains(hostMessagingView, "const facilitatorVoiceLabel = 'Persona-matched voice';", 'host command center uses accurate persona voice wording');

@@ -5834,6 +5834,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
     then calls the handle-facilitator-response edge function with
     sessionStart=True so the AI produces a personalised welcome message.
     """
+    claim_acquired = False
     try:
         # A single database state transition is the welcome ownership lock.  The
         # old message-count and process-local lock could race with the host
@@ -5858,6 +5859,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             )
         if not claim:
             return
+        claim_acquired = True
 
         # Fetch conversation + session + facilitator details needed by the AI
         async with _acquire_lifecycle_connection("welcome context") as conn:
@@ -5875,7 +5877,13 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             )
 
         if not row:
-            log_session.warning("welcome-bg: conversation %s not found, skipping.", conv_id)
+            log_session.warning("welcome-bg: conversation %s not found; releasing welcome claim.", conv_id)
+            async with _acquire_lifecycle_connection("welcome missing-conversation recovery") as recovery_conn:
+                await recovery_conn.execute(
+                    "UPDATE conversations SET welcome_message_status = 'pending' "
+                    "WHERE id = $1 AND welcome_message_status = 'ai_generating'",
+                    conv_id,
+                )
             return
 
         row = dict(row)
@@ -5991,8 +5999,13 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
-        _oai_client_welcome = await _get_openai_client(_model)
+        _used_fallback = False
         try:
+            # Client construction is deliberately inside this guard. Missing or
+            # invalid persisted provider credentials must create a usable room,
+            # not leave the atomic claim in ai_generating forever.
+            _oai_client_welcome = await _get_openai_client(_model)
+
             def _call_openai():
                 return _oai_client_welcome.chat.completions.create(
                     model=_model,
@@ -6005,13 +6018,16 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                 )
             loop = asyncio.get_event_loop()
             _resp = await loop.run_in_executor(None, _call_openai)
-            _txt = _resp.choices[0].message.content.strip()
+            _txt = (_resp.choices[0].message.content or "").strip()
+            if not _txt:
+                raise ValueError("welcome provider returned an empty response")
             if _resp.usage:
                 _prompt_tokens     = _resp.usage.prompt_tokens
                 _completion_tokens = _resp.usage.completion_tokens
                 _model_used        = _resp.model or _model
         except Exception as _ai_err:
-            log_session.error("welcome-bg: OpenAI error for conv=%s: %s", conv_id, _ai_err)
+            _used_fallback = True
+            log_session.error("welcome-bg: provider unavailable for conv=%s; persisting fallback: %s", conv_id, _ai_err)
             _txt = (
                 f'Welcome to "{_session_title}"! I\'m {_facilitator}, and I\'m excited to facilitate today.\n\n'
                 f"Our objective is: {_objective}\n\n"
@@ -6036,8 +6052,9 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                     )
                     _msg_id = _msg_row["id"]
                     await conn.execute(
-                        "UPDATE conversations SET welcome_message_status = 'ai_ready' WHERE id = $1",
-                        conv_id
+                        "UPDATE conversations SET welcome_message_status = $1 WHERE id = $2",
+                        'fallback_ready' if _used_fallback else 'ai_ready',
+                        conv_id,
                     )
                     if _cost_usd > 0:
                         await conn.execute(
@@ -6065,8 +6082,27 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             }))
         except Exception as _db_err:
             log_session.error("welcome-bg: DB error saving welcome message for conv=%s: %s", conv_id, _db_err, exc_info=True)
+            try:
+                async with _acquire_lifecycle_connection("welcome persistence recovery") as recovery_conn:
+                    await recovery_conn.execute(
+                        "UPDATE conversations SET welcome_message_status = 'pending' "
+                        "WHERE id = $1 AND welcome_message_status = 'ai_generating'",
+                        conv_id,
+                    )
+            except Exception:
+                log_session.exception("welcome-bg: unable to release failed welcome claim for conv=%s", conv_id)
     except Exception as e:
         log_session.error("welcome-bg: error generating welcome message for conv=%s: %s", conv_id, e, exc_info=True)
+        if claim_acquired:
+            try:
+                async with _acquire_lifecycle_connection("welcome unexpected-error recovery") as recovery_conn:
+                    await recovery_conn.execute(
+                        "UPDATE conversations SET welcome_message_status = 'pending' "
+                        "WHERE id = $1 AND welcome_message_status = 'ai_generating'",
+                        conv_id,
+                    )
+            except Exception:
+                log_session.exception("welcome-bg: unable to release unexpected failed claim for conv=%s", conv_id)
 
 
 # ============================================================
@@ -6340,8 +6376,12 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
-        _oai_client_bg = await _get_openai_client(_model)
         try:
+            # Client resolution is part of the provider boundary. It can fail if
+            # an administrator changes a key or model, and must be covered by the
+            # same durable fallback as a failed completion request.
+            _oai_client_bg = await _get_openai_client(_model)
+
             def _call_openai_bg():
                 return _oai_client_bg.chat.completions.create(
                     model=_model,
@@ -6354,17 +6394,18 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                 )
             loop = asyncio.get_event_loop()
             _resp = await loop.run_in_executor(None, _call_openai_bg)
-            _txt = _resp.choices[0].message.content.strip()
+            _txt = (_resp.choices[0].message.content or "").strip()
+            if not _txt:
+                raise ValueError("facilitator provider returned an empty response")
             if _resp.usage:
                 _prompt_tokens     = _resp.usage.prompt_tokens
                 _completion_tokens = _resp.usage.completion_tokens
                 _model_used        = _resp.model or _model
         except Exception as _ai_err:
-            log_session.error("facilitator-bg: OpenAI error for conv=%s: %s", conv_id, _ai_err)
+            log_session.error("facilitator-bg: provider unavailable for conv=%s; persisting fallback: %s", conv_id, _ai_err)
             _txt = (
-                "Thank you for sharing your thoughts! I've noted some interesting perspectives.\n\n"
-                "Let me ask a follow-up question: What challenges or obstacles do you see "
-                "in applying these ideas in practice?"
+                "Thank you for sharing your thoughts. I have noted the perspective you brought to the room.\n\n"
+                "What is one concrete example, constraint, or opportunity that would help us explore this more deeply?"
             )
             _model_used = _model
 

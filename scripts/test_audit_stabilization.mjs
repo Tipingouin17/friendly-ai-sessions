@@ -396,7 +396,7 @@ test('session-start and mobile media feedback remain singular and truthful', () 
   assert.match(participantView, /hasHostVideoFrames/);
   assert.match(participantView, /isMuted: true/);
   assert.match(participantView, /Host camera is live/);
-  assert.match(participantView, /Waiting for host camera frames/);
+  assert.match(participantView, /Host camera is off/);
 });
 
 test('tokenized Android invitation reads stay bounded and fail with a clear recovery state', () => {

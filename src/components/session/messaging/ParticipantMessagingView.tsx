@@ -42,7 +42,7 @@ interface ParticipantMessagingViewProps {
   conversationData?: ConversationWithSession | null;
   inputMessage?: string;
   setInputMessage?: (message: string) => void;
-  onSendMessage?: () => void;
+  onSendMessage?: (messageOverride?: string) => Promise<void>;
   isRecording?: boolean;
   setIsRecording?: (isRecording: boolean) => void;
   isAnonymous?: boolean;
@@ -320,7 +320,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   conversationData,
   inputMessage = '',
   setInputMessage = () => { /* no-op */ },
-  onSendMessage = () => { /* no-op */ },
+  onSendMessage = async () => { /* no-op */ },
   isRecording = false,
   setIsRecording = () => { /* no-op */ },
   isAnonymous = false,
@@ -500,6 +500,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const latestAssistantMessage = React.useMemo(() => {
     return [...messages].reverse().find((message) => message.sender === 'assistant') ?? null;
   }, [messages]);
+  const latestVisibleMessage = React.useMemo(() => {
+    return [...messages].reverse().find((message) => !message.isPrivateToHost) ?? null;
+  }, [messages]);
+  const facilitatorTurnStatus = !latestAssistantMessage
+    ? 'Facilitator welcome is preparing'
+    : latestVisibleMessage?.sender === 'user'
+      ? 'Facilitator reply is preparing'
+      : 'Facilitator reply ready';
   const lastFacilitationTechnique = latestAssistantMessage?.facilitationTechnique ?? null;
   const selectedTechniqueKey = lastFacilitationTechnique?.selected
     || lastFacilitationTechnique?.selected_technique
@@ -919,6 +927,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hasHostVideoFrames = Boolean(hostRemoteStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, hasHostVideoFrames);
+  const mobileHostVideoStatusLabel = hasHostVideoFrames
+    ? 'Host camera is live'
+    : connectionStatus === 'failed'
+      ? 'Connection needs retry'
+      : hostTileConnectionStatus === 'connected'
+        ? 'Host camera is off'
+        : connectionStatus === 'disconnected'
+          ? 'Reconnecting to host camera'
+          : 'Connecting to host camera';
   const hostDisplayName = resolveHostDisplayName(hostParticipant);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const facilitatorVideoTile: SessionVideoParticipant = {
@@ -957,8 +974,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const participantVideoTiles: SessionVideoParticipant[] = [facilitatorVideoTile, hostVideoTile, ...orderedVideoParticipants.map((participant) => {
     const isCurrentUser = participant.id === effectiveParticipantId;
     const remoteStream = remoteStreams[String(participant.id)] ?? null;
+    const hasLiveParticipantVideo = Boolean(remoteStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
     const peerStatus = peerStatuses[`participant-${participant.id}`];
-    const tileConnectionStatus = isCurrentUser ? undefined : getPeerTileConnectionStatus(peerStatus, Boolean(remoteStream));
+    const tileConnectionStatus = isCurrentUser ? undefined : getPeerTileConnectionStatus(peerStatus, hasLiveParticipantVideo);
 
     return {
       id: String(participant.id),
@@ -974,7 +992,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       connectionStatus: tileConnectionStatus,
       connectionStatusLabel: isCurrentUser
         ? (cameraIsOn ? 'Your camera is on' : 'Your camera is off')
-        : remoteStream
+        : hasLiveParticipantVideo
           ? 'Live video'
           : tileConnectionStatus === 'connected'
             ? 'Video linked — camera is off'
@@ -1042,21 +1060,40 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     });
   }, [facilitatorRuntime, speechStackEnabled]);
 
-  const handleSpeechFinal = React.useCallback((payload: { transcript: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => {
-    if (!conversationId || !speechStackEnabled) return;
-    facilitatorRuntime?.pushStreamChunk({
-      modality: 'speech',
-      status: 'final',
-      text: payload.transcript,
-      confidence: payload.confidence ?? undefined,
-    });
+  // A recognition implementation can emit an end callback more than once while
+  // permission or focus changes on mobile.  Persist each recognized turn once.
+  const persistedSpeechTurnKeyRef = React.useRef<string | null>(null);
+  const handleSpeechFinal = React.useCallback((payload: { transcript: string; message: string; confidence: number | null; startedAt: string | null; endedAt: string; durationMs: number | null }) => {
+    const transcript = payload.transcript.trim();
+    const message = payload.message.trim();
+    if (!conversationId || !transcript || !message) return;
 
-    if (isOpenDiscussionMode && submitModeInput) {
+    if (speechStackEnabled) {
+      facilitatorRuntime?.pushStreamChunk({
+        modality: 'speech',
+        status: 'final',
+        text: transcript,
+        confidence: payload.confidence ?? undefined,
+      });
+    }
+
+    // Open Discussion is a chat turn.  Voice must enter the same durable,
+    // token-authorized message path as typed input so it appears once in Chat,
+    // updates response progress, and triggers the server-side facilitator reply.
+    // Pass the final snapshot directly instead of setting React state then reading
+    // it synchronously, which is unreliable on Android speech recognition.
+    if (isOpenDiscussionMode) {
+      const turnKey = `${payload.startedAt ?? payload.endedAt}:${message}`;
+      if (persistedSpeechTurnKeyRef.current !== turnKey) {
+        persistedSpeechTurnKeyRef.current = turnKey;
+        void onSendMessage(message);
+      }
+    } else if (submitModeInput) {
       void submitModeInput({
         participantId: effectiveParticipantId,
         inputType: 'voice_transcript',
         content: {
-          transcript: payload.transcript,
+          transcript,
           confidence: payload.confidence,
           modeKey: effectiveModeKey,
           startedAt: payload.startedAt,
@@ -1066,7 +1103,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         },
         visibility: 'attributed',
       }).catch((error) => {
-        console.warn('Unable to submit Open Discussion speech turn to mode pipeline:', error);
+        console.warn('Unable to submit speech turn to mode pipeline:', error);
       });
     }
 
@@ -1076,7 +1113,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       facilitatorId,
       participantId: effectiveParticipantId,
       speakerRole: 'participant',
-      transcript: payload.transcript,
+      transcript,
       confidence: payload.confidence,
       language: phase3Settings?.speech_default_language || conversationData?.language || 'en-US',
       source: 'browser_speech_recognition',
@@ -1084,12 +1121,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       startedAt: payload.startedAt,
       endedAt: payload.endedAt,
       metrics: {
-        composer: isOpenDiscussionMode ? 'open_discussion_live_listening' : 'participant_chat_input',
+        composer: isOpenDiscussionMode ? 'open_discussion_persisted_voice_message' : 'participant_mode_voice_input',
         modeKey: effectiveModeKey,
         activeModeId: activeMode?.id ?? null,
       },
     });
-  }, [activeMode?.id, analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveModeKey, effectiveParticipantId, facilitatorId, facilitatorRuntime, isOpenDiscussionMode, phase3Settings?.speech_default_language, speechStackEnabled, submitModeInput]);
+  }, [activeMode?.id, analyticsPersistenceEnabled, conversationData?.language, conversationId, effectiveModeKey, effectiveParticipantId, facilitatorId, facilitatorRuntime, isOpenDiscussionMode, onSendMessage, phase3Settings?.speech_default_language, speechStackEnabled, submitModeInput]);
 
   // ── Auto-mic: activate speech recognition when open discussion mode opens ──
   // When the facilitator transitions to open discussion, the floor is open for
@@ -1180,7 +1217,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           </div>
         ) : (
           <div className="flex h-full min-h-[140px] items-center justify-center rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-            Participant messages will appear here during the session.
+            {latestAssistantMessage
+              ? 'Participant messages will appear here during the session.'
+              : 'Facilitator welcome is preparing. It will appear here before the discussion begins.'}
           </div>
         )}
       </div>
@@ -1217,12 +1256,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     : voiceRuntime.playbackState === 'playing' ? 'Facilitator is speaking'
                     : voiceRuntime.playbackState === 'blocked' ? 'Audio needs your tap'
                     : voiceRuntime.playbackState === 'failed' ? 'Facilitator voice could not play'
+                    : !lastAssistantMessage ? 'Facilitator welcome is preparing'
                     : 'Facilitator audio is ready'}
                 </p>
                 <p className="truncate text-xs opacity-80">
                   {!ttsAvatarEnabled ? 'Voice was disabled in the session configuration.'
                     : !audioUnlocked ? 'Tap Enable audio once, then every facilitator reply can play on this phone.'
-                    : voiceRuntime.playbackError ?? (lastAssistantMessage ? 'Use Play latest reply to hear the most recent facilitator message.' : 'The facilitator will speak when the next reply is ready.')}
+                    : voiceRuntime.playbackError ?? (lastAssistantMessage ? 'Use Play latest reply to hear the most recent facilitator message.' : 'Audio is prepared; the welcome will play when it is available.')}
                 </p>
               </div>
             </div>
@@ -1304,12 +1344,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           </button>
           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm" role="status" aria-live="polite">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Room video</span>
-            <span className={`mt-0.5 block text-xs font-semibold ${hostRemoteStream ? 'text-emerald-700' : connectionStatus === 'failed' ? 'text-rose-700' : 'text-slate-800'}`}>
-              {hasHostVideoFrames
-                ? 'Host camera is live'
-                : connectionStatus === 'failed'
-                  ? 'Connection needs retry'
-                  : 'Waiting for host camera frames'}
+            <span className={`mt-0.5 block text-xs font-semibold ${hasHostVideoFrames ? 'text-emerald-700' : connectionStatus === 'failed' ? 'text-rose-700' : 'text-slate-800'}`}>
+              {mobileHostVideoStatusLabel}
             </span>
           </div>
         </div>
@@ -1322,17 +1358,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">Current question</span>
                 <span className="session-chip border-indigo-200 bg-indigo-50 text-indigo-700">
-                  {isWaitingForResponses || isWaitingForResponse ? 'Collecting responses' : effectiveModeLabel}
+                  {!latestAssistantMessage
+                    ? 'Preparing welcome'
+                    : isWaitingForResponses || isWaitingForResponse || latestVisibleMessage?.sender === 'user'
+                      ? 'Preparing reply'
+                      : effectiveModeLabel}
                 </span>
               </div>
               <p className="line-clamp-5 text-sm font-medium leading-relaxed text-slate-700 md:line-clamp-none md:text-base">
-                {latestAssistantMessage?.content || activeMode?.prompt || 'The AI facilitator is preparing the next question for the room.'}
+                {latestAssistantMessage?.content || activeMode?.prompt || 'The facilitator is preparing a welcome message for the room.'}
               </p>
               {(activeMode || techniqueModeContext) && (
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">
                   {effectiveModeInstruction}
                 </p>
               )}
+              <p className="mt-2 text-xs font-semibold text-slate-500" role="status" aria-live="polite">{facilitatorTurnStatus}</p>
               <div className="mt-4 flex items-center gap-3">
                 <div className="session-progress-track h-1.5 flex-1 overflow-hidden rounded-full">
                   <div className="session-progress-fill h-full rounded-full transition-all duration-700" style={{ width: `${responseProgress}%` }} />

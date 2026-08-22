@@ -184,18 +184,18 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
     : null;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f1e9ff_0,#f8f5ff_28%,transparent_45%),radial-gradient(circle_at_bottom_right,#fff3d6_0,transparent_38%)] flex items-start justify-center px-4 pt-8 pb-6 sm:items-center">
-      <div className="w-full max-w-3xl">
-        <div className="mb-8 flex flex-col items-center gap-5">
+    <div className="min-h-[100dvh] overflow-y-auto bg-[radial-gradient(circle_at_top_left,#f1e9ff_0,#f8f5ff_28%,transparent_45%),radial-gradient(circle_at_bottom_right,#fff3d6_0,transparent_38%)] px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] sm:flex sm:items-center sm:justify-center sm:py-8">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="mb-5 flex flex-col items-center gap-3 sm:mb-8 sm:gap-5">
           <div className="inline-flex items-center gap-2">
             <div className="rounded-xl bg-indigo-600 p-2 shadow-lg shadow-indigo-500/20">
               <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900">AIfacilitator</span>
+            <span className="text-base font-bold text-gray-900 sm:text-lg">AIfacilitator</span>
           </div>
 
           {facilitatorTitle && (
-            <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-lg shadow-slate-200/70">
+            <div className="inline-flex max-w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-lg shadow-slate-200/70 sm:px-4 sm:py-3">
               {facilitatorAvatar ? (
                 <img src={facilitatorAvatar} alt={facilitatorTitle} className="h-10 w-10 rounded-full object-cover" />
               ) : (
@@ -213,20 +213,20 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
 
         <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-slate-200/70 backdrop-blur">
           <div className="grid gap-0 md:grid-cols-[0.8fr_1.2fr]">
-            <div className="flex flex-col items-center justify-center border-b border-slate-200 p-8 text-center md:border-b-0 md:border-r">
-              <div className="mb-5 flex justify-center">{config.icon}</div>
+            <div className="flex flex-col items-center justify-center border-b border-slate-200 p-5 text-center sm:p-7 md:border-b-0 md:border-r md:p-8">
+              <div className="mb-3 flex justify-center sm:mb-5">{config.icon}</div>
               <p className="text-lg font-bold text-slate-950">{config.title}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
+              <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
                 {phase === 'error' && errorMessage ? errorMessage : config.subtitle}
               </p>
             </div>
 
-            <div className="p-8">
+            <div className="p-5 sm:p-7 md:p-8">
               {shouldShowSessionDetails && (
-                <div className="space-y-6">
-                  {sessionTitle && <h1 className="text-2xl font-bold tracking-tight text-slate-950">{sessionTitle}</h1>}
+                <div className="space-y-4 sm:space-y-6">
+                  {sessionTitle && <h1 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">{sessionTitle}</h1>}
 
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
                     {participantCountLabel && (
                       <span className="inline-flex items-center gap-1.5">
                         <Users className="h-4 w-4" />
@@ -242,16 +242,20 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
                   </div>
 
                   {sessionObjective && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-                      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Session objective</p>
-                      <p className="text-sm leading-6 text-slate-700">{sessionObjective}</p>
-                    </div>
+                    <details className="group rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+                      <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 marker:hidden">
+                        <span className="flex items-center justify-between gap-3">Session details<span className="text-indigo-600 group-open:hidden">Show</span><span className="hidden text-indigo-600 group-open:inline">Hide</span></span>
+                      </summary>
+                      <p className="mt-3 text-sm leading-6 text-slate-700">{sessionObjective}</p>
+                    </details>
                   )}
 
-                  <div>
-                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Currently in waiting room</p>
-                    <ParticipantAvatarStack participants={participants} totalCount={currentParticipantCount} />
-                  </div>
+                  {phase === 'waiting_host' && currentParticipantCount !== undefined && (
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">People in the room</p>
+                      <div className="mt-2"><ParticipantAvatarStack participants={participants} totalCount={currentParticipantCount} /></div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -290,7 +294,7 @@ const ParticipantLoadingShell: React.FC<ParticipantLoadingShellProps> = ({
           </div>
         </div>
 
-        <p className="mt-7 text-center text-xs text-gray-400">
+        <p className="mt-5 text-center text-xs text-gray-400 sm:mt-7">
           Powered by AIfacilitator · AI-driven workshop facilitation
         </p>
       </div>

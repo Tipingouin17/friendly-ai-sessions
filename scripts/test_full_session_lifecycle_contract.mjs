@@ -26,7 +26,7 @@ assert.match(startBody, /UPDATE conversations\s+SET session_started = TRUE,\s+st
 assert.doesNotMatch(startBody, /session_started_at/);
 assert.match(startBody, /AND COALESCE\(is_session_ended, FALSE\) = FALSE/);
 assert.match(startBody, /RETURNING id, session_started, status, is_session_ended, welcome_message_status/);
-assert.match(startBody, /asyncio\.create_task\(_maybe_generate_welcome_message\(start_conversation_id\)\)/);
+assert.match(startBody, /await _maybe_generate_welcome_message\(start_conversation_id\)/);
 assert.match(startBody, /await _require_conversation_host_access\(request, start_conversation_id\)/);
 
 // The host UI must call only the authoritative route, never a direct DB/LLM sequence.

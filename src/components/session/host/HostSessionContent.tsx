@@ -240,7 +240,7 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
   }, [isSessionEnded, stopHostCamera]);
 
   const shouldEnableHostVideoRoom = Boolean(currentConversationId) && !isSessionEnded;
-  const { remoteStreams, peerStatuses } = useWebRTCSession({
+  const { remoteStreams, peerStatuses, retryConnection } = useWebRTCSession({
     conversationId: currentConversationId,
     role: 'host',
     participants,
@@ -248,6 +248,12 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
     enabled: shouldEnableHostVideoRoom,
   });
   const remoteVideoCount = Object.values(remoteStreams).filter((stream) => hasLiveVideoFrames(stream)).length;
+  const hasRecoverableVideoPeer = Object.values(peerStatuses).some((status) => (
+    status.connectionState === 'failed'
+    || status.connectionState === 'disconnected'
+    || status.iceConnectionState === 'failed'
+    || status.iceConnectionState === 'disconnected'
+  ));
   const videoRoomStatusLabel = !shouldEnableHostVideoRoom
     ? 'Video room ended'
     : remoteVideoCount > 0
@@ -728,6 +734,18 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
 
               {hostCameraError && (
                 <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">{hostCameraError}</p>
+              )}
+              {hasRecoverableVideoPeer && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-medium text-amber-800">A participant video connection needs one fresh retry.</p>
+                  <button
+                    type="button"
+                    onClick={retryConnection}
+                    className="session-control-button rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700"
+                  >
+                    Retry video connection
+                  </button>
+                </div>
               )}
 
               {videoLayout === 'gallery' ? (

@@ -1,9 +1,10 @@
 """Regression harness for the background welcome fallback boundary.
 
 This test drives `_maybe_generate_welcome_message` with the configured AI-client
-resolver forced to fail. It verifies that the atomic welcome claim is completed
-by a persisted, broadcast assistant message and a `fallback_ready` terminal
-status instead of remaining `ai_generating`.
+resolver replaced by a failure sentinel. It verifies that the atomic welcome
+claim persists and broadcasts a deterministic assistant opening without invoking
+a provider client, and reaches a `fallback_ready` terminal status instead of
+remaining `ai_generating`.
 """
 
 from __future__ import annotations
@@ -120,20 +121,25 @@ async def main() -> None:
     original_client_resolver = server._get_openai_client
     original_broadcast = server.manager.broadcast
 
-    async def fail_client_resolution(_model: str):
-        raise ValueError("configured provider key is unavailable")
+    client_resolution_calls = 0
+
+    async def fail_if_called(_model: str):
+        nonlocal client_resolution_calls
+        client_resolution_calls += 1
+        raise AssertionError("the deterministic welcome must not resolve a provider client")
 
     async def capture_broadcast(topic: str, event: dict[str, Any]):
         db.broadcasts.append((topic, event))
 
     try:
         server._pool = FakePool(db)
-        server._get_openai_client = fail_client_resolution
+        server._get_openai_client = fail_if_called
         server.manager.broadcast = capture_broadcast
 
         await server._maybe_generate_welcome_message(CONVERSATION_ID)
         await asyncio.sleep(0)
 
+        assert client_resolution_calls == 0
         assert len(db.inserted_messages) == 1
         persisted = db.inserted_messages[0]
         assert persisted["conversation_id"] == CONVERSATION_ID
@@ -150,7 +156,7 @@ async def main() -> None:
         server._get_openai_client = original_client_resolver
         server.manager.broadcast = original_broadcast
 
-    print("WELCOME_CLIENT_RESOLUTION_FALLBACK_HARNESS_PASS")
+    print("WELCOME_DETERMINISTIC_OPENING_HARNESS_PASS")
     print(f"messages={len(db.inserted_messages)} broadcasts={len(db.broadcasts)} status={db.status_updates[0][0]}")
 
 

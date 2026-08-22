@@ -262,6 +262,10 @@ def _format_session_setup_context(participant_description: Optional[str]) -> str
 # ============================================================
 # App & rate limiter
 # ============================================================
+# Live facilitator follow-up turns remain usable when an external model gateway
+# is slow or unreachable; the first greeting is deterministic and does not call
+# a provider on the session-start critical path.
+FACILITATOR_PROVIDER_TIMEOUT_SECONDS = 15
 limiter = Limiter(key_func=get_remote_address)
 # NOTE: app is re-created with lifespan= below (after lifespan() is defined).
 # This placeholder is overwritten; do not add routes here.
@@ -5995,46 +5999,22 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
             )
         _user_prompt += WELCOME_AGENDA_AND_PACING_REQUIREMENTS
 
-        # Call OpenAI (synchronous SDK — run in executor to avoid blocking event loop)
+        # The first visible room message is availability-critical. It must not
+        # wait on any model gateway, key lookup, or provider network request:
+        # those dependencies are still used for normal participant follow-ups.
+        # Persisting this facilitator-specific opening immediately gives every
+        # started room a usable transcript and audio source.
         _prompt_tokens: Optional[int] = None
         _completion_tokens: Optional[int] = None
         _model_used: Optional[str] = None
-        _used_fallback = False
-        try:
-            # Client construction is deliberately inside this guard. Missing or
-            # invalid persisted provider credentials must create a usable room,
-            # not leave the atomic claim in ai_generating forever.
-            _oai_client_welcome = await _get_openai_client(_model)
-
-            def _call_openai():
-                return _oai_client_welcome.chat.completions.create(
-                    model=_model,
-                    messages=[
-                        {"role": "system", "content": _system_msg},
-                        {"role": "user",   "content": _user_prompt},
-                    ],
-                    max_tokens=_max_tokens,
-                    temperature=_temperature,
-                )
-            loop = asyncio.get_event_loop()
-            _resp = await loop.run_in_executor(None, _call_openai)
-            _txt = (_resp.choices[0].message.content or "").strip()
-            if not _txt:
-                raise ValueError("welcome provider returned an empty response")
-            if _resp.usage:
-                _prompt_tokens     = _resp.usage.prompt_tokens
-                _completion_tokens = _resp.usage.completion_tokens
-                _model_used        = _resp.model or _model
-        except Exception as _ai_err:
-            _used_fallback = True
-            log_session.error("welcome-bg: provider unavailable for conv=%s; persisting fallback: %s", conv_id, _ai_err)
-            _txt = (
-                f'Welcome to "{_session_title}"! I\'m {_facilitator}, and I\'m excited to facilitate today.\n\n'
-                f"Our objective is: {_objective}\n\n"
-                "We will begin by clarifying context, then explore perspectives and examples through a few focused questions before we synthesize patterns or move toward conclusions. I will adapt the pace to the group and the time available.\n\n"
-                "To get us started — what is the most important thing you want this session to help clarify or improve?"
-            )
-            _model_used = _model
+        _used_fallback = True
+        _txt = (
+            f'Welcome to "{_session_title}"! I\'m {_facilitator}, and I\'m glad you are here.\n\n'
+            f"Our focus today is: {_objective}\n\n"
+            "We will begin with context, explore perspectives and examples, then pause to synthesize useful patterns before deciding on next steps. Share concise, specific thoughts, stay curious about different viewpoints, and build on what others contribute.\n\n"
+            "To get us started, what is the most important thing you want this session to clarify or improve?"
+        )
+        log_session.info("welcome-bg: persisting deterministic opening for conv=%s", conv_id)
 
         # Persist the welcome message and update conversation status
         _cost_usd = _calculate_token_cost(_model_used or _model, _prompt_tokens or 0, _completion_tokens or 0)
@@ -6380,7 +6360,10 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             # Client resolution is part of the provider boundary. It can fail if
             # an administrator changes a key or model, and must be covered by the
             # same durable fallback as a failed completion request.
-            _oai_client_bg = await _get_openai_client(_model)
+            _oai_client_bg = await asyncio.wait_for(
+                _get_openai_client(_model),
+                timeout=FACILITATOR_PROVIDER_TIMEOUT_SECONDS,
+            )
 
             def _call_openai_bg():
                 return _oai_client_bg.chat.completions.create(
@@ -6393,7 +6376,10 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                     temperature=_temperature,
                 )
             loop = asyncio.get_event_loop()
-            _resp = await loop.run_in_executor(None, _call_openai_bg)
+            _resp = await asyncio.wait_for(
+                loop.run_in_executor(None, _call_openai_bg),
+                timeout=FACILITATOR_PROVIDER_TIMEOUT_SECONDS,
+            )
             _txt = (_resp.choices[0].message.content or "").strip()
             if not _txt:
                 raise ValueError("facilitator provider returned an empty response")
@@ -6811,7 +6797,7 @@ async def rest_table(table: str, request: Request):
                             and signal_data.get("kind") == "webrtc_signal"
                             and signal_data.get("version") == 1
                             and str(signal_data.get("conversationId")) == str(conversation_id)
-                            and str(signal_data.get("signalType")) in {"offer", "answer", "ice-candidate", "camera-ready", "camera-stopped"}
+                            and str(signal_data.get("signalType")) in {"offer", "answer", "ice-candidate", "camera-ready", "camera-stopped", "reconnect-request"}
                         )
                         if participant_message or participant_webrtc_signal:
                             if not await _validate_join_token(join_token_header, conversation_id):
@@ -7214,9 +7200,10 @@ async def edge_function(func_name: str, request: Request):
             raise HTTPException(404, detail={"code": "session_not_startable", "message": "This session could not be started because it is unavailable or already closed."})
 
         started_payload = serialize_row(dict(started_row))
-        # The room transition must never wait on an LLM.  The server owns the
-        # one-time welcome claim and performs generation in the background.
-        asyncio.create_task(_maybe_generate_welcome_message(start_conversation_id))
+        # The first opening is now deterministic and database-only, so commit it
+        # before reporting a room as active. This prevents an active participant
+        # shell from observing an empty transcript while a detached task stalls.
+        await _maybe_generate_welcome_message(start_conversation_id)
         asyncio.create_task(manager.broadcast(str(start_conversation_id), {
             "event": "UPDATE",
             "payload": {

@@ -20,7 +20,7 @@ import { removeChannel } from '@/utils/realtimeHelpers';
 import type { ParticipantInfo } from '@/types/chat';
 
 export type WebRTCRole = 'host' | 'participant';
-export type WebRTCSignalType = 'offer' | 'answer' | 'ice-candidate' | 'camera-ready' | 'camera-stopped';
+export type WebRTCSignalType = 'offer' | 'answer' | 'ice-candidate' | 'camera-ready' | 'camera-stopped' | 'reconnect-request';
 export type WebRTCConnectionStatus = 'idle' | 'unsupported' | 'connecting' | 'connected' | 'disconnected' | 'failed';
 
 export interface WebRTCPeerStatus {
@@ -101,6 +101,8 @@ interface UseWebRTCSessionResult {
   peerStatuses: Record<string, WebRTCPeerStatus>;
   activePeerCount: number;
   diagnostics: WebRTCDiagnostics;
+  /** Close stale peers and initiate one fresh ICE-backed offer/answer exchange. */
+  retryConnection: () => void;
 }
 
 interface PeerRecord {
@@ -130,8 +132,10 @@ const WEBRTC_SIGNAL_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const WEBRTC_SIGNAL_CATCHUP_INTERVAL_MS = 3_000;
 const WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS = 15_000;
 const WEBRTC_SIGNAL_CATCHUP_LIMIT = 80;
-const WEBRTC_CAMERA_READY_BURST_COUNT = 6;
-const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 2_000;
+// The participant is the designated initial offerer to the host. One bounded
+// retry covers subscription races without creating an endless offer/ICE storm.
+const WEBRTC_CAMERA_READY_BURST_COUNT = 2;
+const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 3_000;
 const WEBRTC_ICE_RENEGOTIATION_DELAY_MS = 750;
 const WEBRTC_ICE_STALL_TIMEOUT_MS = 12_000;
 const WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS = 45_000;
@@ -533,7 +537,10 @@ export function useWebRTCSession({
       renegotiationTimersRef.current.delete(peerId);
       const record = peersRef.current.get(peerId);
       if (!record || record.connection.signalingState === 'closed' || record.connection.connectionState === 'closed') return;
-      record.connection.restartIce?.();
+      // A normal camera-ready renegotiation changes SDP track direction only.
+      // Restarting ICE for every such offer invalidates in-flight candidates and
+      // was causing same-Wi-Fi peers to fall into reconnect-needed loops.
+      if (options.iceRestart) record.connection.restartIce?.();
       renegotiatePeerRef.current(peerId, options);
     }, WEBRTC_ICE_RENEGOTIATION_DELAY_MS);
 
@@ -805,6 +812,19 @@ export function useWebRTCSession({
       return;
     }
 
+    if (signal.signalType === 'reconnect-request') {
+      // A user explicitly requested one clean recovery attempt. The designated
+      // participant offerer owns the fresh ICE generation; the host simply
+      // clears its stale answerer peer and waits for that offer.
+      closePeer(signal.fromPeerId);
+      if (isLocalOffererForPeer(signal.fromPeerId)) {
+        window.setTimeout(() => {
+          void createOffer(signal.fromPeerId, { iceRestart: true });
+        }, 0);
+      }
+      return;
+    }
+
     const record = getOrCreatePeer(signal.fromPeerId);
     if (!record) return;
 
@@ -891,7 +911,19 @@ export function useWebRTCSession({
       console.warn('Unable to process WebRTC signal:', error);
       updatePeerStatus(record);
     }
-  }, [closePeer, conversationId, enforceAnswerDirectionsForRemoteOffer, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, syncRemoteReceiverStream, updatePeerStatus]);
+  }, [closePeer, conversationId, createOffer, enforceAnswerDirectionsForRemoteOffer, flushPendingCandidates, getOrCreatePeer, isCurrentPeerRecord, isLocalOffererForPeer, localPeerId, rememberSignal, removeRemoteStream, schedulePeerRenegotiation, sendSignal, syncLocalStreamToPeer, syncRemoteReceiverStream, updatePeerStatus]);
+
+  const retryConnection = useCallback(() => {
+    remotePeerIdsRef.current.forEach((peerId) => {
+      closePeer(peerId);
+      void sendSignal(peerId, { signalType: 'reconnect-request' });
+      if (isLocalOffererForPeer(peerId)) {
+        window.setTimeout(() => {
+          void createOffer(peerId, { iceRestart: true });
+        }, 0);
+      }
+    });
+  }, [closePeer, createOffer, isLocalOffererForPeer, sendSignal]);
 
   const catchUpRecentSignals = useCallback(async () => {
     if (!conversationId || !localPeerId) return;
@@ -969,29 +1001,32 @@ export function useWebRTCSession({
   useEffect(() => {
     if (!enabled || !conversationId || !localPeerId || !hasRealtimeSupport) return;
 
-    let readyBurstsSent = 0;
-    const announcePeerReady = () => {
-      readyBurstsSent += 1;
+    // Hosts are answerers for participant peers. They must not emit repeated
+    // readiness signals during initial room setup because every participant
+    // already owns the first offer. A host camera toggled after a peer exists is
+    // handled separately by the local-stream effect above.
+    if (role === 'host') return;
+
+    let attempts = 0;
+    const createInitialOffer = () => {
+      attempts += 1;
       remotePeerIds.forEach((peerId) => {
-        if (isLocalOffererForPeer(peerId)) {
-          void createOffer(peerId);
-        } else {
-          void sendSignal(peerId, { signalType: 'camera-ready' });
-        }
+        if (!isLocalOffererForPeer(peerId)) return;
+        const record = peersRef.current.get(peerId);
+        // Retry once only when no remote signal has arrived. This prevents a
+        // second normal offer from replacing an active same-Wi-Fi negotiation.
+        if (attempts > 1 && record?.lastSignalAt) return;
+        void createOffer(peerId);
       });
     };
 
-    announcePeerReady();
-    const readyTimer = window.setInterval(() => {
-      if (readyBurstsSent >= WEBRTC_CAMERA_READY_BURST_COUNT) {
-        window.clearInterval(readyTimer);
-        return;
-      }
-      announcePeerReady();
+    createInitialOffer();
+    const retryTimer = window.setTimeout(() => {
+      if (attempts < WEBRTC_CAMERA_READY_BURST_COUNT) createInitialOffer();
     }, WEBRTC_CAMERA_READY_BURST_INTERVAL_MS);
 
-    return () => window.clearInterval(readyTimer);
-  }, [conversationId, createOffer, enabled, hasRealtimeSupport, isLocalOffererForPeer, localPeerId, remotePeerIds, sendSignal]);
+    return () => window.clearTimeout(retryTimer);
+  }, [conversationId, createOffer, enabled, hasRealtimeSupport, isLocalOffererForPeer, localPeerId, remotePeerIds, role]);
 
   useEffect(() => {
     const activeRemotePeers = new Set(remotePeerIds);
@@ -1053,6 +1088,7 @@ export function useWebRTCSession({
     peerStatuses,
     activePeerCount: Object.keys(peerStatuses).length,
     diagnostics,
+    retryConnection,
   };
 }
 

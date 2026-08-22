@@ -357,7 +357,7 @@ test('server-owned session start is immediate, singular, and does not block on a
   assert.ok(startSessionSection, 'start-session handler must remain present');
   assert.doesNotMatch(startSessionSection[1], /session_started_at/);
   assert.match(server, /await _require_conversation_host_access\(request, start_conversation_id\)/);
-  assert.match(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(start_conversation_id\)\)/);
+  assert.match(server, /await _maybe_generate_welcome_message\(start_conversation_id\)/);
   assert.match(server, /await asyncio\.to_thread\(_call_facilitator_model\)/);
   assert.match(startHook, /functions\.invoke\(\s*'start-session'/s);
   assert.doesNotMatch(startHook, /handle-facilitator-response/);

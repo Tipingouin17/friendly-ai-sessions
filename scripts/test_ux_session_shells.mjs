@@ -190,7 +190,7 @@ assertContains(webRTCSessionHook, "signalType: 'camera-ready'", 'WebRTC hook sup
 assertContains(webRTCSessionHook, "signalType: 'camera-stopped'", 'WebRTC hook tears down remote streams when a camera stops');
 assertContains(webRTCSessionHook, "filter: `conversation_id=eq.${conversationId}`", 'WebRTC realtime channel is scoped to the active conversation');
 assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_RETENTION_MS', 'WebRTC hook defines stale signaling retention');
-assertContains(webRTCSessionHook, 'WEBRTC_CAMERA_READY_BURST_COUNT', 'WebRTC hook repeats camera-ready hints to recover missed realtime inserts');
+assertContains(webRTCSessionHook, 'WEBRTC_CAMERA_READY_BURST_COUNT', 'WebRTC hook bounds initial participant-offer retries to recover a missed realtime subscription');
 assertContains(webRTCSessionHook, 'WEBRTC_SIGNAL_CATCHUP_INTERVAL_MS', 'WebRTC hook polls recent persisted signals to recover missed realtime inserts');
 assertContains(webRTCSessionHook, 'catchUpRecentSignals', 'WebRTC hook has a missed-signal catch-up path for late host/participant tabs');
 assertContains(webRTCSessionHook, 'rememberSignal', 'WebRTC hook deduplicates realtime and catch-up signaling events');
@@ -211,7 +211,9 @@ assertContains(webRTCSessionHook, "record.connection.signalingState !== 'have-lo
 assertContains(webRTCSessionHook, 'await syncLocalStreamToPeer(record, localStreamRef.current);', 'WebRTC answerer syncs local camera stream only after applying the remote offer');
 assertContains(webRTCSessionHook, "role === 'participant' && peerId === HOST_PEER_ID", 'WebRTC participant actively creates the offer to the host when its camera is live');
 assertNotContains(webRTCSessionHook, '!localStream || !hasRealtimeSupport', 'WebRTC peer readiness is not blocked by a missing local stream after participant refresh');
-assertContains(webRTCSessionHook, 'const announcePeerReady = () => {', 'WebRTC refresh/rejoin announces peer readiness even before camera restoration completes');
+assertContains(webRTCSessionHook, 'const createInitialOffer = () => {', 'WebRTC refresh/rejoin creates a bounded initial offer even before camera restoration completes');
+assertContains(webRTCSessionHook, "if (role === 'host') return;", 'WebRTC host avoids readiness bursts because participants own the initial offer');
+assertContains(webRTCSessionHook, 'if (options.iceRestart) record.connection.restartIce?.();', 'WebRTC does not restart ICE for an ordinary camera-ready renegotiation');
 assertContains(webRTCSessionHook, "role === 'host' && peerId !== HOST_PEER_ID", 'WebRTC host waits for participant offers to avoid glare and ghost peer bootstraps');
 assertContains(webRTCSessionHook, 'if (!isLocalOffererForPeer(peerId)) return;', 'WebRTC createOffer is guarded so non-offerer reconnect paths cannot create glare');
 assertContains(participantView, 'resolvePositiveParticipantId', 'Participant video shell rejects participant-0 identity fallbacks');

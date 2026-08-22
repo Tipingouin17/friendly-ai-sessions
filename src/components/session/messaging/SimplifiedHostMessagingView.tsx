@@ -98,7 +98,10 @@ const SimplifiedHostMessagingView: React.FC<SimplifiedHostMessagingViewProps> = 
   toolboxError = null,
   facilitatorVoiceGender = null,
 }) => {
-  const [activeTab, setActiveTab] = useState<'controls' | 'transcript'>('controls');
+  // In a live room the host's primary job is to see participant activity and
+  // the facilitator conversation. Optional steering controls remain available
+  // but must not hide an empty or newly arriving transcript by default.
+  const [activeTab, setActiveTab] = useState<'controls' | 'transcript'>('transcript');
   const [hostInstruction, setHostInstruction] = useState('');
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
 

@@ -14,6 +14,7 @@ const realtime = read('src/hooks/useSessionRealtime.ts');
 const hostManager = read('src/hooks/useHostParticipantManager.ts');
 const hostLogic = read('src/hooks/useSessionHostLogic.ts');
 const participantContext = read('src/hooks/useSessionParticipantContext.ts');
+const pageState = read('src/hooks/useSessionPageState.ts');
 
 // Database truth: capacity includes the host; the persisted current count counts attendees only.
 includes(server, 'AND COALESCE(is_host, FALSE) = FALSE', 'atomic join count excludes host rows');
@@ -36,5 +37,10 @@ includes(hostManager, 'const max     = Math.max((data.participants || 0) - 1, 0)
 includes(hostManager, 'const attendeeCount = updated.filter((participant) => !participant.isHost).length;', 'host manager reconciles delayed count broadcasts from roster data');
 includes(hostLogic, 'const attendeeCountFromConversation = Math.max(currentCount, 0);', 'host readiness uses attendee count directly');
 includes(hostLogic, 'const attendeeCapacityFromManager = Math.max(maxCount, 0);', 'host does not subtract normalized capacity twice');
+
+// The attendee occupying the final accepted seat is not an overflow joiner.
+includes(pageState, "const isAdmittedParticipant = query.has('participantId');", 'full-room notification identifies admitted participants');
+includes(pageState, 'if (isAdmittedParticipant || stateRef.current.hasShownSessionFullToast) return;', 'full-room notification is suppressed for admitted participants and deduplicated');
+includes(pageState, 'hasShownSessionFullToast: false', 'page state tracks a single legitimate full-room notification');
 
 console.log('Live seat synchronization contract passed: one persisted attendee maps to one displayed joined seat and host readiness update.');

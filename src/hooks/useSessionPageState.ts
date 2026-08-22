@@ -22,6 +22,7 @@ export function useSessionPageState() {
     error: null as string | null,
     noSessionFound: false,
     hasShownToast: false,
+    hasShownSessionFullToast: false,
     pageLoadTime: typeof window !== 'undefined' ? Date.now() : 0 // Initialize synchronously
   });
   
@@ -78,14 +79,19 @@ export function useSessionPageState() {
   
   // Session full handler
   const handleSessionFull = useCallback(() => {
-    // Full capacity must not locally mark the participant room as live. The
-    // redesigned flow requires the host's explicit Start Session action, which
-    // is reflected through the database-backed session_started flag.
+    // A participant with a persisted slot is the attendee who legitimately
+    // filled the room; capacity events must never be presented to them as an
+    // error. The host start marker remains the sole transition into the room.
+    const query = new URLSearchParams(location.search);
+    const isAdmittedParticipant = query.has('participantId');
+    if (isAdmittedParticipant || stateRef.current.hasShownSessionFullToast) return;
+
+    stateRef.current.hasShownSessionFullToast = true;
     toast({
       title: "Session is full",
       description: "The room is full. Please wait for the host to start the session.",
     });
-  }, [toast]);
+  }, [location.search, toast]);
   
   // Retry connection handler
   const retryConnection = useCallback(() => {

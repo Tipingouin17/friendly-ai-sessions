@@ -6675,6 +6675,48 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
 # ============================================================
 # PostgREST REST table CRUD
 # ============================================================
+def _schedule_post_insert_session_work(table: str, rows: list[dict[str, Any]]) -> None:
+    """Launch idempotent session work after a durable REST insert.
+
+    Realtime broadcast envelope selection is deliberately separate from this
+    scheduler. A `messages` row normally takes the standard broadcast branch,
+    while session-mode rows take a different envelope; neither routing choice
+    may suppress the welcome or facilitator-continuation task.
+    """
+    if table not in {"messages", "session_participants"}:
+        return
+    for row in rows:
+        raw_conversation_id = row.get("conversation_id")
+        try:
+            conversation_id = int(raw_conversation_id)
+        except (TypeError, ValueError):
+            log_session.warning(
+                "post-insert session work skipped: table=%s invalid conversation_id=%r",
+                table,
+                raw_conversation_id,
+            )
+            continue
+        if table == "session_participants":
+            log_session.info(
+                "REST POST /session_participants -> scheduling welcome convergence for conv=%s",
+                conversation_id,
+            )
+            asyncio.create_task(_maybe_generate_welcome_message(conversation_id))
+        elif row.get("role") == "user":
+            log_session.info(
+                "REST POST /messages -> scheduling AI facilitator continuation for conv=%s msg_id=%s",
+                conversation_id,
+                row.get("id"),
+            )
+            asyncio.create_task(_maybe_generate_facilitator_response(conversation_id))
+        else:
+            log_session.debug(
+                "REST POST /messages -> no continuation for role=%s conv=%s",
+                row.get("role"),
+                conversation_id,
+            )
+
+
 @app.delete("/auth/v1/user/sessions/{session_id}")
 async def revoke_user_session(session_id: str, request: Request):
     """Revoke a specific user session (marks it as revoked in user_sessions table)."""
@@ -7141,6 +7183,7 @@ async def rest_table(table: str, request: Request):
                                     "schema": "public",
                                 },
                             }))
+                    _schedule_post_insert_session_work(table, results)
                     return JSONResponse(content=results, status_code=201)
                 else:
                     cols = ", ".join([f'"{k}"' for k in data.keys()])
@@ -7184,24 +7227,7 @@ async def rest_table(table: str, request: Request):
                                     "schema": "public",
                                 },
                             }))
-                        if table == "session_participants" and conv_id:
-                            asyncio.create_task(_maybe_generate_welcome_message(int(conv_id)))
-                        # Auto-trigger AI facilitator response when a participant posts a message.
-                        # This makes the AI response cycle server-driven and fully resilient:
-                        # the host browser tab does NOT need to be open for the AI to respond.
-                        # The function checks internally whether all expected participants have
-                        # answered before generating a response (idempotent, mutex-protected).
-                        if table == "messages" and conv_id and result.get("role") == "user":
-                            log_session.info(
-                                "REST POST /messages -> triggering AI facilitator for conv=%s msg_id=%s",
-                                conv_id, result.get("id"),
-                            )
-                            asyncio.create_task(_maybe_generate_facilitator_response(int(conv_id)))
-                        elif table == "messages" and conv_id:
-                            log_session.debug(
-                                "REST POST /messages -> NOT triggering AI (role=%s conv=%s)",
-                                result.get("role"), conv_id,
-                            )
+                    _schedule_post_insert_session_work(table, [result])
                     return JSONResponse(content=result, status_code=201)
 
             if request.method == "PATCH":

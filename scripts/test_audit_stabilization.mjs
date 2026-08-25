@@ -330,7 +330,7 @@ test('mobile facilitator voice remains enabled, replayable, and independently au
   assert.match(voiceHook, /data:audio\/wav;base64/);
 });
 
-test('welcome generation is server-owned, atomically claimed, and cannot be duplicated by join or participant recovery paths', () => {
+test('welcome generation is server-owned, atomically claimed, and scheduled only through the shared post-insert boundary', () => {
   const server = readFileSync(resolve(repoRoot, 'supabase_proxy/server_fastapi.py'), 'utf8');
   const fetcher = readFileSync(resolve(repoRoot, 'src/hooks/session-messages/useMessageFetching.ts'), 'utf8');
   const recovery = readFileSync(resolve(repoRoot, 'src/hooks/useWelcomeMessageRecovery.ts'), 'utf8');
@@ -338,7 +338,9 @@ test('welcome generation is server-owned, atomically claimed, and cannot be dupl
   assert.match(server, /welcome_already_claimed/);
   assert.match(server, /SET welcome_message_status = 'ai_generating'/);
   assert.match(server, /A single database state transition is the welcome ownership lock/);
-  assert.doesNotMatch(server, /asyncio\.create_task\(_maybe_generate_welcome_message\(conversation_id\)\)/);
+  assert.match(server, /def _schedule_post_insert_session_work\(table: str, rows: list\[dict\[str, Any\]\]\)/);
+  assert.match(server, /REST POST \/session_participants -> scheduling welcome convergence/);
+  assert.doesNotMatch(server, /await _maybe_generate_welcome_message\(start_conversation_id\)/);
   assert.doesNotMatch(fetcher, /sessionStart:\s*true/);
   assert.doesNotMatch(fetcher, /Client-side fallback if Edge Function fails/);
   assert.doesNotMatch(recovery, /api\.functions\.invoke\('handle-facilitator-response'/);

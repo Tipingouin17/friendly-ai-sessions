@@ -93,6 +93,11 @@ assertContains(fastApiServer, 'async def _persist_facilitator_continuation_fallb
 assertContains(fastApiServer, "'deterministic-fallback'", 'continuation recovery uses a traceable standard assistant fallback model marker');
 assertContains(fastApiServer, "WHERE conversation_id = $1 AND role = 'assistant' AND id > $4", 'continuation recovery is idempotent when a normal assistant turn already exists');
 assertContains(fastApiServer, 'if _response_lock_acquired:\n            await _persist_facilitator_continuation_fallback(', 'post-answer continuation errors persist visible recovery text rather than only logging');
+assertContains(fastApiServer, 'def _schedule_post_insert_session_work(table: str, rows: list[dict[str, Any]])', 'post-insert session scheduling is isolated from broadcast envelope routing');
+assertContains(fastApiServer, 'REST POST /messages -> scheduling AI facilitator continuation', 'normal persisted user messages visibly schedule the server-owned continuation');
+assertContains(fastApiServer, '_schedule_post_insert_session_work(table, results)', 'batch inserts invoke shared post-insert scheduling after broadcast routing');
+assertContains(fastApiServer, '_schedule_post_insert_session_work(table, [result])', 'single-row inserts invoke shared post-insert scheduling after broadcast routing');
+assertNotContains(fastApiServer, 'if table == "messages" and conv_id and result.get("role") == "user":', 'continuation scheduling is not trapped inside the mode-session broadcast branch');
 
 // A full room may become ready, but only the host may call the atomic start endpoint.
 assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start hook cannot call the host start operation');

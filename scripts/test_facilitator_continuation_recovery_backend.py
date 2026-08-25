@@ -231,11 +231,48 @@ async def run_unexpected_error_case() -> None:
         server._ai_response_locks.update(original_locks)
 
 
+async def run_post_insert_scheduler_case() -> None:
+    original_continuation = server._maybe_generate_facilitator_response
+    original_welcome = server._maybe_generate_welcome_message
+    scheduled: list[tuple[str, int]] = []
+
+    async def capture_continuation(conversation_id: int):
+        scheduled.append(("continuation", conversation_id))
+
+    async def capture_welcome(conversation_id: int):
+        scheduled.append(("welcome", conversation_id))
+
+    try:
+        server._maybe_generate_facilitator_response = capture_continuation
+        server._maybe_generate_welcome_message = capture_welcome
+
+        server._schedule_post_insert_session_work(
+            "messages",
+            [
+                {"id": 1, "conversation_id": CONVERSATION_ID, "role": "user"},
+                {"id": 2, "conversation_id": CONVERSATION_ID, "role": "assistant"},
+            ],
+        )
+        server._schedule_post_insert_session_work(
+            "session_participants",
+            [{"id": 3, "conversation_id": CONVERSATION_ID}],
+        )
+        await asyncio.sleep(0)
+
+        assert scheduled.count(("continuation", CONVERSATION_ID)) == 1
+        assert scheduled.count(("welcome", CONVERSATION_ID)) == 1
+        assert len(scheduled) == 2
+    finally:
+        server._maybe_generate_facilitator_response = original_continuation
+        server._maybe_generate_welcome_message = original_welcome
+
+
 async def main() -> None:
     await run_selector_failure_case()
     await run_unexpected_error_case()
+    await run_post_insert_scheduler_case()
     print("FACILITATOR_CONTINUATION_RECOVERY_HARNESS_PASS")
-    print("selector_failure=assistant_reply unexpected_error=deterministic_recovery")
+    print("selector_failure=assistant_reply unexpected_error=deterministic_recovery scheduler=user_message_only")
 
 
 if __name__ == "__main__":

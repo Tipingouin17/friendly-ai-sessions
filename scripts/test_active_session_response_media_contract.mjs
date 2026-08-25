@@ -26,6 +26,7 @@ const fastApiServer = read('supabase_proxy/server_fastapi.py');
 const autoStartSession = read('src/hooks/useAutoStartSession.ts');
 const hostLogic = read('src/hooks/useSessionHostLogic.ts');
 const sessionState = read('src/hooks/useSessionState.ts');
+const sessionTimer = read('src/hooks/useSessionTimer.ts');
 
 // Voice and typed turns share one durable message boundary.
 assertContains(chatInput, 'message: finalizedMessage', 'speech final callback exports an explicit finalized message snapshot');
@@ -89,6 +90,11 @@ assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start
 assertNotContains(autoStartSession, 'autoStartTimeoutRef', 'legacy auto-start timer has been removed');
 assertNotContains(hostLogic, 'void triggerAutoStart(', 'host capacity callbacks never initiate session start');
 assertNotContains(sessionState, 'setSessionStarted(true)', 'participant capacity state cannot locally mark the room live');
+assertContains(sessionTimer, 'runtime_started_at', 'live timer prefers the persisted host-start timestamp over workshop creation time');
+assertContains(sessionTimer, 'const startAt = runtimeStartedAt ?? conversation.created_at;', 'historical sessions retain a creation-time fallback only when no runtime start exists');
+assertContains(fastApiServer, "'{runtime_started_at}'", 'atomic start records a schema-supported runtime start timestamp');
+assertContains(hostContent, 'currentParticipantCount={reconciledParticipantCount}', 'active host panel uses the reconciled attendee count');
+assertContains(hostContent, 'maxParticipants={maxParticipants}', 'active host panel uses attendee capacity rather than host-inclusive storage');
 
 // Host camera changes must request renegotiation from the designated participant offerer,
 // without restarting ICE for ordinary camera-ready SDP changes.

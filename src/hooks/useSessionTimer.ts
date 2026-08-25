@@ -3,8 +3,8 @@
  *
  * Manages the live countdown timer for a running session.
  *
- * - Derives end time from conversation.created_at + session_duration_minutes
- *   (or sessions.duration_minutes as fallback).
+ * - Derives end time from the persisted runtime start timestamp in flow_config,
+ *   falling back to conversation.created_at only for historical sessions.
  * - When no duration is set (0 or null), the timer returns null values so the
  *   badge shows "No limit" with add-time buttons for the host.
  * - Exposes timeRemaining (seconds), isExpired, isWarning (≤10 min),
@@ -74,7 +74,8 @@ export function useSessionTimer(
 
   // Compute end time:
   // - If the host added time to a previously no-duration session, use addTimeOriginRef
-  // - Otherwise use conversation.created_at + currentDuration
+  // - Otherwise use the persisted runtime start timestamp; historical sessions
+  //   without one fall back to conversation.created_at.
   const endTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -85,13 +86,20 @@ export function useSessionTimer(
     if (addTimeOriginRef.current !== null) {
       // Host set a duration mid-session — count from when they first added time
       endTimeRef.current = addTimeOriginRef.current + currentDuration * 60 * 1000;
-    } else if (conversation?.created_at) {
-      const startMs = new Date(conversation.created_at).getTime();
-      endTimeRef.current = startMs + currentDuration * 60 * 1000;
+    } else if (conversation) {
+      const flowConfig = conversation.flow_config as Record<string, unknown> | null | undefined;
+      const runtimeStartedAt = typeof flowConfig?.runtime_started_at === 'string'
+        ? flowConfig.runtime_started_at
+        : null;
+      const startAt = runtimeStartedAt ?? conversation.created_at;
+      const startMs = startAt ? new Date(startAt).getTime() : Number.NaN;
+      endTimeRef.current = Number.isFinite(startMs)
+        ? startMs + currentDuration * 60 * 1000
+        : null;
     } else {
       endTimeRef.current = null;
     }
-  }, [conversation?.created_at, currentDuration]);
+  }, [conversation?.created_at, conversation?.flow_config, currentDuration]);
 
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 

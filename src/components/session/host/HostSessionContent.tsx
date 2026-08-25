@@ -677,8 +677,8 @@ const HostSessionContent: React.FC<HostSessionContentProps> = ({
             <div className="min-h-0 flex-1 overflow-hidden [&>*]:h-full [&>*]:border-0 [&>*]:bg-transparent">
               <HostParticipantList
                 participants={participants || []}
-                currentParticipantCount={actualParticipantCount}
-                maxParticipants={conversationData?.participants || 10}
+                currentParticipantCount={reconciledParticipantCount}
+                maxParticipants={maxParticipants}
                 isLoading={isLoadingParticipants}
                 conversationData={conversationData}
                 messages={sessionMessages}

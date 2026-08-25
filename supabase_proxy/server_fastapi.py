@@ -7289,6 +7289,12 @@ async def edge_function(func_name: str, request: Request):
                     UPDATE conversations
                     SET session_started = TRUE,
                         status = 'active',
+                        flow_config = jsonb_set(
+                            COALESCE(flow_config, '{}'::jsonb),
+                            '{runtime_started_at}',
+                            to_jsonb(COALESCE(flow_config->>'runtime_started_at', NOW()::text)),
+                            TRUE
+                        ),
                         welcome_message_status = CASE
                             WHEN COALESCE(welcome_message_status, 'pending') IN ('ai_ready', 'template_ready')
                                 THEN welcome_message_status
@@ -7296,7 +7302,7 @@ async def edge_function(func_name: str, request: Request):
                         END
                     WHERE id = $1
                       AND COALESCE(is_session_ended, FALSE) = FALSE
-                    RETURNING id, session_started, status, is_session_ended, welcome_message_status
+                    RETURNING id, session_started, status, is_session_ended, welcome_message_status, flow_config
                     """,
                     start_conversation_id,
                 )

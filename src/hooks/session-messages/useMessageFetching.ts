@@ -236,7 +236,7 @@ export const useMessageFetching = ({
     );
     setIsGeneratingWelcome(waitingForServerWelcome);
 
-    if ((currentStatus === 'ai_ready' || currentStatus === 'template_ready' || currentStatus === 'fallback_ready') && !hasAssistantMessage) {
+    if ((currentStatus === 'ai_ready' || currentStatus === 'template_ready') && !hasAssistantMessage) {
       void fetchMessagesFromDB();
     }
   }, [conversationId, conversation, fetchMessagesFromDB]);

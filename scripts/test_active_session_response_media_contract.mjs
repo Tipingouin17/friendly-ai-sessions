@@ -66,11 +66,11 @@ assertContains(fastApiServer, 'lock_timeout_ms=2000', 'start-session fails lock 
 assertContains(fastApiServer, 'start_stage = {"value": "activation"}', 'start-session records a non-sensitive durable failure stage');
 assertContains(fastApiServer, 'start_stage["value"] = "welcome_insert"', 'start-session identifies the welcome persistence boundary in contention recovery');
 assertContains(fastApiServer, "welcome_message_status = CASE", 'start-session marks the deterministic opening ready in its initial activation update');
-assertContains(fastApiServer, "ELSE 'fallback_ready'", 'atomic activation makes the welcome available without a second conversation write');
-assertNotContains(fastApiServer, "UPDATE conversations SET welcome_message_status = 'fallback_ready' WHERE id = $1", 'start-session avoids the redundant post-insert welcome-status update that can contend');
+assertContains(fastApiServer, "ELSE 'ai_ready'", 'atomic activation makes the deterministic welcome available with a schema-supported terminal state');
+assertNotContains(fastApiServer, "fallback_ready", 'start-session critical path never writes the database-incompatible fallback status');
 assertContains(fastApiServer, '"code": code', 'lifecycle database failures return structured retryable error codes');
 assertNotContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session never relies on detached welcome generation');
-assertContains(fastApiServer, "'fallback_ready' if _used_fallback else 'ai_ready'", 'welcome persists a terminal fallback-ready status');
+assertContains(fastApiServer, "'ai_ready',", 'welcome fallback persists the schema-supported ready terminal status');
 assertContains(fastApiServer, "WHERE id = $1 AND welcome_message_status = 'ai_generating'", 'welcome failure releases only its active generation claim');
 assertNotContains(fastApiServer, '_oai_client_welcome', 'welcome must not wait on a provider client');
 assertContains(fastApiServer, 'FACILITATOR_PROVIDER_TIMEOUT_SECONDS = 15', 'facilitator reply has an explicit provider timeout');

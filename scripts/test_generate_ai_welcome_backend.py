@@ -199,7 +199,7 @@ async def main():
     fallback = await invoke({"conversationId": CONVERSATION_ID})
     assert fallback["success"] is True
     assert fallback["generated"] is False
-    assert fallback["status"] == "fallback_ready"
+    assert fallback["status"] == "ai_ready"
     assert "Discovery Workshop" in fallback["message"]
     assert "align on the next product milestone" in fallback["message"]
     assert db.helper_calls == [CONVERSATION_ID, CONVERSATION_ID]

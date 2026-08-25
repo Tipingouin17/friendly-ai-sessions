@@ -155,7 +155,7 @@ async def main() -> None:
         assert persisted["conversation_id"] == CONVERSATION_ID
         assert persisted["name"] == "Ada"
         assert "Welcome to \"Discovery workshop\"" in persisted["content"]["text"]
-        assert db.status_updates == [("fallback_ready", CONVERSATION_ID)]
+        assert db.status_updates == [("ai_ready", CONVERSATION_ID)]
         assert len(db.broadcasts) == 1
         topic, event = db.broadcasts[0]
         assert topic == str(CONVERSATION_ID)

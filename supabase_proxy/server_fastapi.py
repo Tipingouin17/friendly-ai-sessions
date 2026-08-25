@@ -5925,7 +5925,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                     WHERE conversation_id = $1 AND role = 'assistant'
                   )
                   AND COALESCE(welcome_message_status, 'pending')
-                      NOT IN ('ai_generating', 'ai_ready', 'template_ready', 'fallback_ready')
+                      NOT IN ('ai_generating', 'ai_ready', 'template_ready')
                 RETURNING id
                 """,
                 conv_id,
@@ -6102,7 +6102,7 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                     _msg_id = _msg_row["id"]
                     await conn.execute(
                         "UPDATE conversations SET welcome_message_status = $1 WHERE id = $2",
-                        'fallback_ready' if _used_fallback else 'ai_ready',
+                        'ai_ready',
                         conv_id,
                     )
                     if _cost_usd > 0:
@@ -7276,7 +7276,7 @@ async def edge_function(func_name: str, request: Request):
                         welcome_message_status = CASE
                             WHEN COALESCE(welcome_message_status, 'pending') IN ('ai_ready', 'template_ready')
                                 THEN welcome_message_status
-                            ELSE 'fallback_ready'
+                            ELSE 'ai_ready'
                         END
                     WHERE id = $1
                       AND COALESCE(is_session_ended, FALSE) = FALSE
@@ -7355,7 +7355,7 @@ async def edge_function(func_name: str, request: Request):
                     }
 
         started_payload = serialize_row(dict(started_row))
-        started_payload["welcome_message_status"] = "fallback_ready" if welcome_message_payload else started_payload.get("welcome_message_status")
+        started_payload["welcome_message_status"] = "ai_ready" if welcome_message_payload else started_payload.get("welcome_message_status")
         # Realtime delivery is a recovery path, not part of the HTTP lifecycle
         # acknowledgement. A stale legacy WebSocket may block send_json(), so
         # waiting for fan-out here can strand the host on a still-enabled Start
@@ -7491,7 +7491,7 @@ async def edge_function(func_name: str, request: Request):
                             WHERE conversation_id = $1 AND role = 'assistant'
                           )
                           AND COALESCE(welcome_message_status, 'pending')
-                              NOT IN ('ai_generating', 'ai_ready', 'template_ready', 'fallback_ready')
+                              NOT IN ('ai_generating', 'ai_ready', 'template_ready')
                         RETURNING id
                         """,
                         conv_id,
@@ -8112,7 +8112,7 @@ async def edge_function(func_name: str, request: Request):
             "avatar": content.get("avatar"),
             "success": True,
             "generated": generated,
-            "status": "ai_ready" if generated else "fallback_ready",
+            "status": "ai_ready",
         }
 
 

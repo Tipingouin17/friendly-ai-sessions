@@ -7272,7 +7272,12 @@ async def edge_function(func_name: str, request: Request):
                     """
                     UPDATE conversations
                     SET session_started = TRUE,
-                        status = 'active'
+                        status = 'active',
+                        welcome_message_status = CASE
+                            WHEN COALESCE(welcome_message_status, 'pending') IN ('ai_ready', 'template_ready')
+                                THEN welcome_message_status
+                            ELSE 'fallback_ready'
+                        END
                     WHERE id = $1
                       AND COALESCE(is_session_ended, FALSE) = FALSE
                     RETURNING id, session_started, status, is_session_ended, welcome_message_status
@@ -7339,11 +7344,6 @@ async def edge_function(func_name: str, request: Request):
                         start_conversation_id,
                         json.dumps(welcome_content),
                         facilitator_name,
-                    )
-                    start_stage["value"] = "welcome_status"
-                    await start_conn.execute(
-                        "UPDATE conversations SET welcome_message_status = 'fallback_ready' WHERE id = $1",
-                        start_conversation_id,
                     )
                     welcome_message_payload = {
                         "id": str(welcome_row["id"]),

@@ -65,6 +65,9 @@ assertContains(fastApiServer, 'statement_timeout_ms=12000', 'start-session allow
 assertContains(fastApiServer, 'lock_timeout_ms=2000', 'start-session fails lock contention promptly and cleanly');
 assertContains(fastApiServer, 'start_stage = {"value": "activation"}', 'start-session records a non-sensitive durable failure stage');
 assertContains(fastApiServer, 'start_stage["value"] = "welcome_insert"', 'start-session identifies the welcome persistence boundary in contention recovery');
+assertContains(fastApiServer, "welcome_message_status = CASE", 'start-session marks the deterministic opening ready in its initial activation update');
+assertContains(fastApiServer, "ELSE 'fallback_ready'", 'atomic activation makes the welcome available without a second conversation write');
+assertNotContains(fastApiServer, "UPDATE conversations SET welcome_message_status = 'fallback_ready' WHERE id = $1", 'start-session avoids the redundant post-insert welcome-status update that can contend');
 assertContains(fastApiServer, '"code": code', 'lifecycle database failures return structured retryable error codes');
 assertNotContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session never relies on detached welcome generation');
 assertContains(fastApiServer, "'fallback_ready' if _used_fallback else 'ai_ready'", 'welcome persists a terminal fallback-ready status');

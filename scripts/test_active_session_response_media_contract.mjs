@@ -49,7 +49,7 @@ assertContains(fastApiServer, 'claim_acquired = False', 'welcome claim has recov
 assertContains(fastApiServer, 'The first visible room message is availability-critical.', 'welcome documents its non-provider critical path');
 assertContains(fastApiServer, "_used_fallback = True", 'welcome marks its deterministic opening as terminal fallback-ready');
 assertContains(fastApiServer, 'Welcome to "{_session_title}"!', 'welcome uses a facilitator-specific deterministic opening');
-assertContains(fastApiServer, 'async with _bounded_lifecycle_transaction(start_conn, "start session"):', 'start-session wraps activation and welcome persistence in one bounded atomic transaction');
+assertContains(fastApiServer, 'async with _bounded_lifecycle_transaction(\n                start_conn,\n                "start session",', 'start-session wraps activation and welcome persistence in one bounded atomic transaction');
 assertContains(fastApiServer, "INSERT INTO messages (conversation_id, content, role, name)", 'start-session writes the deterministic welcome row directly');
 assertContains(fastApiServer, '"welcome": "committed"', 'start-session reports a committed rather than scheduled opening');
 assertContains(fastApiServer, 'async def _broadcast_started_room()', 'start-session isolates non-durable realtime fan-out from its HTTP response');
@@ -60,7 +60,12 @@ assertContains(fastApiServer, 'Host authorization is part of every interactive l
 assertContains(fastApiServer, 'The acquisition budget deliberately ends before yielding.', 'lifecycle pool timeout cannot cancel caller transactions after connection acquisition');
 assertContains(fastApiServer, 'async def _bounded_lifecycle_transaction', 'interactive lifecycle SQL has a transaction-scoped database timeout boundary');
 assertContains(fastApiServer, "SET LOCAL statement_timeout", 'lifecycle transaction uses PostgreSQL-side query and lock budget');
-assertContains(fastApiServer, 'async with _bounded_lifecycle_transaction(start_conn, "start session"):', 'start-session maps database transaction failures to a structured lifecycle response');
+assertContains(fastApiServer, 'async with _bounded_lifecycle_transaction(', 'start-session maps database transaction failures to a structured lifecycle response');
+assertContains(fastApiServer, 'statement_timeout_ms=12000', 'start-session allows realistic database work while retaining a bounded query budget');
+assertContains(fastApiServer, 'lock_timeout_ms=2000', 'start-session fails lock contention promptly and cleanly');
+assertContains(fastApiServer, 'start_stage = {"value": "activation"}', 'start-session records a non-sensitive durable failure stage');
+assertContains(fastApiServer, 'start_stage["value"] = "welcome_insert"', 'start-session identifies the welcome persistence boundary in contention recovery');
+assertContains(fastApiServer, '"code": code', 'lifecycle database failures return structured retryable error codes');
 assertNotContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session never relies on detached welcome generation');
 assertContains(fastApiServer, "'fallback_ready' if _used_fallback else 'ai_ready'", 'welcome persists a terminal fallback-ready status');
 assertContains(fastApiServer, "WHERE id = $1 AND welcome_message_status = 'ai_generating'", 'welcome failure releases only its active generation claim');

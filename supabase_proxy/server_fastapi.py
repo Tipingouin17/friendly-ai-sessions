@@ -1001,23 +1001,49 @@ async def _acquire_lifecycle_connection(operation: str):
 
 
 @asynccontextmanager
-async def _bounded_lifecycle_transaction(conn: asyncpg.Connection, operation: str, statement_timeout_ms: int = 6000):
-    """Run interactive lifecycle SQL with a database-side lock/query budget.
+async def _bounded_lifecycle_transaction(
+    conn: asyncpg.Connection,
+    operation: str,
+    statement_timeout_ms: int = 6000,
+    lock_timeout_ms: int | None = None,
+    stage: dict[str, str] | None = None,
+):
+    """Run interactive lifecycle SQL with database-side contention diagnostics.
 
-    The pool-acquisition budget is handled separately. This wrapper scopes
-    PostgreSQL's statement timeout to one transaction so a lock or slow query
-    rolls back cleanly and returns a structured retryable HTTP response rather
-    than cancelling the enclosing ASGI request.
+    Pool acquisition is deliberately bounded separately. This wrapper scopes
+    PostgreSQL lock and statement budgets to one transaction, rolls back cleanly
+    on a database error, and records the caller-supplied durable stage so an
+    interactive action can distinguish contention from a slow query without
+    exposing database internals to the browser.
     """
     try:
         async with conn.transaction():
+            if lock_timeout_ms is not None:
+                await conn.execute(f"SET LOCAL lock_timeout = '{int(lock_timeout_ms)}'")
             await conn.execute(f"SET LOCAL statement_timeout = '{int(statement_timeout_ms)}'")
             yield conn
     except asyncpg.PostgresError as exc:
-        log_session.warning("session lifecycle transaction failed: %s: %s", operation, exc)
+        failure_stage = (stage or {}).get("value", operation)
+        sqlstate = getattr(exc, "sqlstate", None)
+        is_lock_contention = sqlstate == "55P03"
+        code = "session_start_locked" if operation == "start session" and is_lock_contention else (
+            "session_start_busy" if operation == "start session" else "session_lifecycle_busy"
+        )
+        log_session.warning(
+            "session lifecycle transaction failed: operation=%s stage=%s sqlstate=%s error=%s",
+            operation,
+            failure_stage,
+            sqlstate,
+            exc,
+        )
         raise HTTPException(
             503,
-            detail={"code": "session_lifecycle_busy", "message": "The session is temporarily busy. Please wait a few seconds and try again."},
+            detail={
+                "code": code,
+                "message": "The session is temporarily busy. Please wait a few seconds and try again.",
+                "retryable": True,
+                "stage": failure_stage,
+            },
         ) from exc
 
 
@@ -7231,8 +7257,17 @@ async def edge_function(func_name: str, request: Request):
         # room must never be observable as active while its greeting is merely a
         # detached task that can stall on context, provider, or worker failures.
         welcome_message_payload = None
+        # The stage marker is deliberately non-sensitive: it tells the host
+        # which durable boundary can be retried without exposing SQL or data.
+        start_stage = {"value": "activation"}
         async with _acquire_lifecycle_connection("start session") as start_conn:
-            async with _bounded_lifecycle_transaction(start_conn, "start session"):
+            async with _bounded_lifecycle_transaction(
+                start_conn,
+                "start session",
+                statement_timeout_ms=12000,
+                lock_timeout_ms=2000,
+                stage=start_stage,
+            ):
                 started_row = await start_conn.fetchrow(
                     """
                     UPDATE conversations
@@ -7247,6 +7282,7 @@ async def edge_function(func_name: str, request: Request):
                 if not started_row:
                     raise HTTPException(404, detail={"code": "session_not_startable", "message": "This session could not be started because it is unavailable or already closed."})
 
+                start_stage["value"] = "welcome_lookup"
                 existing_welcome = await start_conn.fetchrow(
                     """
                     SELECT id, content, name, created_at
@@ -7273,6 +7309,7 @@ async def edge_function(func_name: str, request: Request):
                         "created_at": existing_welcome["created_at"].isoformat() if existing_welcome["created_at"] else None,
                     }
                 else:
+                    start_stage["value"] = "welcome_context"
                     welcome_context = await start_conn.fetchrow(
                         """
                         SELECT s.title, s.objective, f.title AS facilitator_name
@@ -7292,6 +7329,7 @@ async def edge_function(func_name: str, request: Request):
                             f'Our focus today is {objective}. To begin, what is the most important thing you want this session to clarify or improve?'
                         )
                     }
+                    start_stage["value"] = "welcome_insert"
                     welcome_row = await start_conn.fetchrow(
                         """
                         INSERT INTO messages (conversation_id, content, role, name)
@@ -7302,6 +7340,7 @@ async def edge_function(func_name: str, request: Request):
                         json.dumps(welcome_content),
                         facilitator_name,
                     )
+                    start_stage["value"] = "welcome_status"
                     await start_conn.execute(
                         "UPDATE conversations SET welcome_message_status = 'fallback_ready' WHERE id = $1",
                         start_conversation_id,

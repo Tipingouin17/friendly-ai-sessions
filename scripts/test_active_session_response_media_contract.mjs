@@ -84,6 +84,15 @@ assertContains(fastApiServer, 'facilitator provider returned an empty response',
 assertContains(fastApiServer, 'provider unavailable for conv=%s; persisting fallback', 'reply provider failure produces persisted fallback copy');
 assertContains(fastApiServer, 'INSERT INTO messages (conversation_id, content, role, name, ', 'assistant fallback uses the standard persisted messages contract');
 assertContains(fastApiServer, 'manager.broadcast(str(conv_id)', 'persisted assistant fallback broadcasts to room clients');
+assertContains(fastApiServer, 'FACILITATOR_SELECTOR_TIMEOUT_SECONDS = 10', 'optional technique selection has a bounded timeout independent of the reply provider');
+assertContains(fastApiServer, 'asyncio.to_thread(\n                _compress_messages_for_context,', 'selector compression cannot block the event loop before a facilitator reply');
+assertContains(fastApiServer, 'Technique selector preparation failed; using safe open discussion fallback', 'selector preparation failures converge to deterministic open discussion');
+assertContains(fastApiServer, 'await asyncio.wait_for(\n                _select_facilitation_technique(', 'main continuation bounds optional technique selection before response generation');
+assertContains(fastApiServer, 'Technique selection unavailable; continuing with safe open discussion', 'main continuation uses a deterministic selector fallback on timeout or error');
+assertContains(fastApiServer, 'async def _persist_facilitator_continuation_fallback', 'unexpected post-answer failures have a dedicated durable recovery boundary');
+assertContains(fastApiServer, "'deterministic-fallback'", 'continuation recovery uses a traceable standard assistant fallback model marker');
+assertContains(fastApiServer, "WHERE conversation_id = $1 AND role = 'assistant' AND id > $4", 'continuation recovery is idempotent when a normal assistant turn already exists');
+assertContains(fastApiServer, 'if _response_lock_acquired:\n            await _persist_facilitator_continuation_fallback(', 'post-answer continuation errors persist visible recovery text rather than only logging');
 
 // A full room may become ready, but only the host may call the atomic start endpoint.
 assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start hook cannot call the host start operation');

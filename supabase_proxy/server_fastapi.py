@@ -266,6 +266,9 @@ def _format_session_setup_context(participant_description: Optional[str]) -> str
 # is slow or unreachable; the first greeting is deterministic and does not call
 # a provider on the session-start critical path.
 FACILITATOR_PROVIDER_TIMEOUT_SECONDS = 15
+# Adaptive technique selection is optional. It must never delay or prevent the
+# durable facilitator continuation after a participant has answered.
+FACILITATOR_SELECTOR_TIMEOUT_SECONDS = 10
 limiter = Limiter(key_func=get_remote_address)
 # NOTE: app is re-created with lifespan= below (after lifespan() is defined).
 # This placeholder is overwritten; do not add routes here.
@@ -756,8 +759,33 @@ async def _select_facilitation_technique(conv_id: int, conn_pool: asyncpg.Pool, 
             mode[key] = _safe_json_value(mode.get(key), default)
 
     participant_messages = [dict(r) for r in recent_participant_rows]
-    _oai_client_compress1 = await _get_openai_client("gpt-4.1-nano")
-    compressed_messages = _compress_messages_for_context(participant_messages, "gpt-4.1-nano", _oai_client_compress1)
+    try:
+        # Compression and technique selection are quality enhancements, not a
+        # prerequisite for a visible facilitator turn. Resolve the optional
+        # client and execute synchronous compression under a strict budget.
+        _oai_client_compress1 = await asyncio.wait_for(
+            _get_openai_client("gpt-4.1-nano"),
+            timeout=FACILITATOR_SELECTOR_TIMEOUT_SECONDS,
+        )
+        compressed_messages = await asyncio.wait_for(
+            asyncio.to_thread(
+                _compress_messages_for_context,
+                participant_messages,
+                "gpt-4.1-nano",
+                _oai_client_compress1,
+            ),
+            timeout=FACILITATOR_SELECTOR_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        log_session.warning(
+            "facilitator-selector: optional context compression failed for conv=%s: %s",
+            conv_id,
+            exc,
+        )
+        return _fallback_facilitation_selection(
+            available_modes,
+            "Technique selector preparation failed; using safe open discussion fallback",
+        )
     answer_lines = []
     for msg in compressed_messages:
         name = msg.get("name") or "Participant"
@@ -860,8 +888,12 @@ Respond with this exact JSON shape:
 }}
 """.strip()
 
-    _oai_client_selector = await _get_openai_client("gpt-4.1-nano")
     try:
+        _oai_client_selector = await asyncio.wait_for(
+            _get_openai_client("gpt-4.1-nano"),
+            timeout=FACILITATOR_SELECTOR_TIMEOUT_SECONDS,
+        )
+
         def _call_selector():
             return _oai_client_selector.chat.completions.create(
                 model="gpt-4.1-nano",
@@ -875,7 +907,10 @@ Respond with this exact JSON shape:
             )
 
         loop = asyncio.get_event_loop()
-        response = await asyncio.wait_for(loop.run_in_executor(None, _call_selector), timeout=8.0)
+        response = await asyncio.wait_for(
+            loop.run_in_executor(None, _call_selector),
+            timeout=FACILITATOR_SELECTOR_TIMEOUT_SECONDS,
+        )
         raw = response.choices[0].message.content.strip()
         parsed = _parse_selector_json(raw)
         selected_key = str(parsed.get("selected_technique") or "").strip()
@@ -6173,6 +6208,82 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
 # ============================================================
 # Background AI facilitator-response helper
 # ============================================================
+async def _persist_facilitator_continuation_fallback(
+    conv_id: int,
+    facilitator_name: str,
+    after_assistant_id: int,
+    reason: str,
+) -> Optional[int]:
+    """Persist one idempotent visible fallback after a post-answer continuation error.
+
+    The participant message has already been accepted at this point. A quality
+    enhancement failure must not strand the room in reply preparation. The
+    `NOT EXISTS` guard prevents a late outer exception from duplicating an
+    assistant turn that was already persisted by the normal path.
+    """
+    fallback_text = (
+        "Thank you for sharing your thoughts. I have noted the perspective you brought to the room.\n\n"
+        "What is one concrete example, constraint, or opportunity that would help us explore this more deeply?"
+    )
+    content = {"text": fallback_text, "fallback_reason": "continuation_recovery"}
+    try:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO messages (conversation_id, content, role, name, model_used)
+                SELECT $1, $2::jsonb, 'assistant', $3, 'deterministic-fallback'
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM messages
+                    WHERE conversation_id = $1 AND role = 'assistant' AND id > $4
+                )
+                RETURNING id
+                """,
+                conv_id,
+                json.dumps(content),
+                facilitator_name or "Facilitator",
+                after_assistant_id,
+            )
+        if not row:
+            log_session.info(
+                "facilitator-bg: fallback skipped for conv=%s because a newer assistant turn exists",
+                conv_id,
+            )
+            return None
+        message_id = row["id"]
+        asyncio.create_task(manager.broadcast(str(conv_id), {
+            "event": "INSERT",
+            "payload": {
+                "eventType": "INSERT",
+                "new": {
+                    "id": str(message_id),
+                    "conversation_id": str(conv_id),
+                    "content": content,
+                    "role": "assistant",
+                    "name": facilitator_name or "Facilitator",
+                    "created_at": datetime.utcnow().isoformat(),
+                },
+                "old": {},
+                "table": "messages",
+                "schema": "public",
+            },
+        }))
+        log_session.warning(
+            "facilitator-bg: persisted deterministic recovery fallback id=%s for conv=%s (%s)",
+            message_id,
+            conv_id,
+            reason,
+        )
+        return int(message_id)
+    except Exception as fallback_error:
+        log_session.error(
+            "facilitator-bg: unable to persist continuation recovery fallback for conv=%s: %s",
+            conv_id,
+            fallback_error,
+            exc_info=True,
+        )
+        return None
+
+
 async def _maybe_generate_facilitator_response(conv_id: int) -> None:
     """Fire-and-forget: generate the AI facilitator response after all participants
     have answered the current question.
@@ -6194,6 +6305,9 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
       6. Insert AI message, broadcast via WebSocket.
     """
     log_session.info("facilitator-bg: CALLED for conv=%s", conv_id)
+    _response_lock_acquired = False
+    _last_ai_id_for_recovery = 0
+    _facilitator_for_recovery = "Facilitator"
     try:
         # ── Idempotency guard ────────────────────────────────────────────────
         _now = time.time()
@@ -6245,6 +6359,7 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                 conv_id
             )
             last_ai_id = last_ai_row["id"] if last_ai_row else 0
+            _last_ai_id_for_recovery = int(last_ai_id)
 
             # Count distinct participant (non-assistant, non-admin) messages after last AI message.
             # COALESCE handles participant_id=NULL (anonymous) by using the row id as a unique key.
@@ -6280,11 +6395,13 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
 
         # ── All participants answered — acquire lock and generate response ───
         _ai_response_locks[_lock_key] = time.time()
+        _response_lock_acquired = True
 
         # ── Resolve facilitator context ──────────────────────────────────────
         _session_title     = row.get("title") or "this workshop"
         _facilitator_id    = row.get("facilitator_id")
         _facilitator       = row.get("facilitator_name") or "Facilitator"
+        _facilitator_for_recovery = _facilitator
         _details           = row.get("facilitator_details") or ""
         _objective         = row.get("objective") or "facilitate a productive discussion"
         _session_prompt    = row.get("prompt") or ""
@@ -6370,16 +6487,29 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             + _lang_instr
         )
         # ── Select adaptive facilitation technique ─────────────────────────
-        _technique_selection = await _select_facilitation_technique(conv_id, _pool, {
-            "facilitator_id": _facilitator_id,
-            "facilitator_name": _facilitator,
-            "title": _session_title,
-            "objective": _objective,
-            "scope": _scope,
-            "expected_participants": expected_participants,
-            "response_count": response_count,
-            "last_ai_id": last_ai_id,
-        })
+        try:
+            _technique_selection = await asyncio.wait_for(
+                _select_facilitation_technique(conv_id, _pool, {
+                    "facilitator_id": _facilitator_id,
+                    "facilitator_name": _facilitator,
+                    "title": _session_title,
+                    "objective": _objective,
+                    "scope": _scope,
+                    "expected_participants": expected_participants,
+                    "response_count": response_count,
+                    "last_ai_id": last_ai_id,
+                }),
+                timeout=FACILITATOR_SELECTOR_TIMEOUT_SECONDS,
+            )
+        except Exception as selector_error:
+            log_session.warning(
+                "facilitator-bg: optional technique selection failed for conv=%s: %s; using open discussion",
+                conv_id,
+                selector_error,
+            )
+            _technique_selection = _fallback_facilitation_selection(
+                reason="Technique selection unavailable; continuing with safe open discussion",
+            )
         _selected_mode = _technique_selection.get("selected_mode") or {}
         _mode_floor_rules = _safe_json_value(_selected_mode.get("floor_rules"), {})
         _mode_ai_responsibilities = _safe_json_value(_selected_mode.get("ai_responsibilities"), [])
@@ -6533,6 +6663,13 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             log_session.error("facilitator-bg: DB error for conv=%s: %s", conv_id, _db_err, exc_info=True)
     except Exception as e:
         log_session.error("facilitator-bg: unexpected error for conv=%s: %s", conv_id, e, exc_info=True)
+        if _response_lock_acquired:
+            await _persist_facilitator_continuation_fallback(
+                conv_id,
+                _facilitator_for_recovery,
+                _last_ai_id_for_recovery,
+                type(e).__name__,
+            )
 
 
 # ============================================================

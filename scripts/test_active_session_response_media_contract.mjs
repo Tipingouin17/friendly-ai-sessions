@@ -95,6 +95,8 @@ assertContains(fastApiServer, "WHERE conversation_id = $1 AND role = 'assistant'
 assertContains(fastApiServer, 'if _response_lock_acquired:\n            await _persist_facilitator_continuation_fallback(', 'post-answer continuation errors persist visible recovery text rather than only logging');
 assertContains(fastApiServer, 'def _schedule_post_insert_session_work(table: str, rows: list[dict[str, Any]])', 'post-insert session scheduling is isolated from broadcast envelope routing');
 assertContains(fastApiServer, 'REST POST /messages -> scheduling AI facilitator continuation', 'normal persisted user messages visibly schedule the server-owned continuation');
+assertContains(fastApiServer, 'SELECT runtime_cfg.tts_avatar_enabled\n                           FROM configurations runtime_cfg\n                           LIMIT 1', 'continuation context uses the schema-supported global runtime configuration row');
+assertNotContains(fastApiServer, 'cfg.user_id = s.user_id', 'continuation context never assumes a nonexistent per-user configurations column');
 assertContains(fastApiServer, '_schedule_post_insert_session_work(table, results)', 'batch inserts invoke shared post-insert scheduling after broadcast routing');
 assertContains(fastApiServer, '_schedule_post_insert_session_work(table, [result])', 'single-row inserts invoke shared post-insert scheduling after broadcast routing');
 assertNotContains(fastApiServer, 'if table == "messages" and conv_id and result.get("role") == "user":', 'continuation scheduling is not trapped inside the mode-session broadcast branch');

@@ -6329,11 +6329,14 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                        f.id as facilitator_id,
                        f.title as facilitator_name, f.details as facilitator_details,
                        f.profile_picture, f.languages as facilitator_languages,
-                       COALESCE(cfg.tts_avatar_enabled, TRUE) as tts_avatar_enabled
+                       COALESCE((
+                           SELECT runtime_cfg.tts_avatar_enabled
+                           FROM configurations runtime_cfg
+                           LIMIT 1
+                       ), TRUE) as tts_avatar_enabled
                 FROM conversations c
                 LEFT JOIN sessions s ON s.id = c.sessions_id
                 LEFT JOIN facilitators f ON f.id = s.facilitator
-                LEFT JOIN configurations cfg ON cfg.user_id = s.user_id
                 WHERE c.id = $1
                 """,
                 conv_id

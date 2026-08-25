@@ -58,7 +58,9 @@ class FakeConnection:
             return {
                 "id": CONVERSATION_ID,
                 "is_session_ended": False,
-                "participants": 1,
+                # Production stores host-inclusive capacity: one host + one
+                # attendee must normalize to a single required response.
+                "participants": 2,
                 "conversation_language": "en",
                 "participant_description": "Product team",
                 "title": "Continuation workshop",

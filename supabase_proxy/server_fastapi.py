@@ -6351,7 +6351,11 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
             log_session.debug("facilitator-bg: session %s already ended, skipping", conv_id)
             return
 
-        expected_participants = int(row.get("participants") or 1)
+        # conversations.participants is host-inclusive. The facilitator waits for
+        # attendee responses only, so stored capacity 2 means one host plus one
+        # participant response is required before the next facilitator turn.
+        stored_participant_capacity = int(row.get("participants") or 1)
+        expected_participants = max(1, stored_participant_capacity - 1)
 
         # ── Check how many participants have answered since last AI message ──
         async with _pool.acquire() as conn:
@@ -6385,8 +6389,8 @@ async def _maybe_generate_facilitator_response(conv_id: int) -> None:
                 response_count = int(fallback_row["cnt"] or 0) if fallback_row else 0
 
         log_session.info(
-            "facilitator-bg: conv=%s responses=%d/%d since last AI msg id=%s",
-            conv_id, response_count, expected_participants, last_ai_id
+            "facilitator-bg: conv=%s responses=%d/%d attendees (stored_capacity=%d) since last AI msg id=%s",
+            conv_id, response_count, expected_participants, stored_participant_capacity, last_ai_id
         )
 
         if response_count < expected_participants:

@@ -97,6 +97,9 @@ assertContains(fastApiServer, 'def _schedule_post_insert_session_work(table: str
 assertContains(fastApiServer, 'REST POST /messages -> scheduling AI facilitator continuation', 'normal persisted user messages visibly schedule the server-owned continuation');
 assertContains(fastApiServer, 'SELECT runtime_cfg.tts_avatar_enabled\n                           FROM configurations runtime_cfg\n                           LIMIT 1', 'continuation context uses the schema-supported global runtime configuration row');
 assertNotContains(fastApiServer, 'cfg.user_id = s.user_id', 'continuation context never assumes a nonexistent per-user configurations column');
+assertContains(fastApiServer, 'stored_participant_capacity = int(row.get("participants") or 1)', 'continuation captures the stored host-inclusive capacity explicitly');
+assertContains(fastApiServer, 'expected_participants = max(1, stored_participant_capacity - 1)', 'continuation waits for attendee responses rather than host-inclusive stored capacity');
+assertContains(fastApiServer, 'responses=%d/%d attendees (stored_capacity=%d)', 'continuation logs normalized attendee threshold diagnostics');
 assertContains(fastApiServer, '_schedule_post_insert_session_work(table, results)', 'batch inserts invoke shared post-insert scheduling after broadcast routing');
 assertContains(fastApiServer, '_schedule_post_insert_session_work(table, [result])', 'single-row inserts invoke shared post-insert scheduling after broadcast routing');
 assertNotContains(fastApiServer, 'if table == "messages" and conv_id and result.get("role") == "user":', 'continuation scheduling is not trapped inside the mode-session broadcast branch');

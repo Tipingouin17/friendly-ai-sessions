@@ -4292,7 +4292,11 @@ async def _require_conversation_host_access(request: Request, conversation_id: i
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    async with _pool.acquire() as conn:
+    # Host authorization is part of every interactive lifecycle action. It must
+    # obey the same bounded pool-acquisition contract as start/stop so an
+    # exhausted pool returns a retryable 503 instead of leaving the browser
+    # request pending before the durable lifecycle transaction can begin.
+    async with _acquire_lifecycle_connection("host authorization") as conn:
         allowed = await conn.fetchval(
             """
             SELECT EXISTS (

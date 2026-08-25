@@ -70,6 +70,9 @@ assertContains(fastApiServer, "ELSE 'ai_ready'", 'atomic activation makes the de
 assertNotContains(fastApiServer, "fallback_ready", 'start-session critical path never writes the database-incompatible fallback status');
 assertContains(fastApiServer, '"code": code', 'lifecycle database failures return structured retryable error codes');
 assertNotContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session never relies on detached welcome generation');
+assertContains(fastApiServer, 'reason": "start_session_endpoint_required"', 'legacy session-start compatibility calls cannot schedule a competing welcome');
+assertContains(fastApiServer, 'welcome stale-claim recovery', 'a stale generating claim converges to ready when the committed opening exists');
+assertContains(fastApiServer, "WHERE NOT EXISTS (SELECT 1 FROM messages WHERE conversation_id = $1 AND role = 'assistant')", 'a pre-start welcome claimant cannot insert a duplicate after atomic host start');
 assertContains(fastApiServer, "'ai_ready',", 'welcome fallback persists the schema-supported ready terminal status');
 assertContains(fastApiServer, "WHERE id = $1 AND welcome_message_status = 'ai_generating'", 'welcome failure releases only its active generation claim');
 assertNotContains(fastApiServer, '_oai_client_welcome', 'welcome must not wait on a provider client');

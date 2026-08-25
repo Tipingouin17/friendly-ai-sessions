@@ -5931,6 +5931,17 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                 conv_id,
             )
         if not claim:
+            # A legacy client can arrive after atomic start while an older
+            # background task still holds ai_generating. If the room already
+            # has its durable opening, converge the persisted state instead of
+            # leaving the UI to report a generation that cannot add a message.
+            async with _acquire_lifecycle_connection("welcome stale-claim recovery") as recovery_conn:
+                await recovery_conn.execute(
+                    "UPDATE conversations SET welcome_message_status = 'ai_ready' "
+                    "WHERE id = $1 AND welcome_message_status = 'ai_generating' "
+                    "AND EXISTS (SELECT 1 FROM messages WHERE conversation_id = $1 AND role = 'assistant')",
+                    conv_id,
+                )
             return
         claim_acquired = True
 
@@ -6095,16 +6106,21 @@ async def _maybe_generate_welcome_message(conv_id: int) -> None:
                     _msg_row = await conn.fetchrow(
                         "INSERT INTO messages (conversation_id, content, role, name, "
                         "prompt_tokens, completion_tokens, model_used) "
-                        "VALUES ($1, $2::jsonb, 'assistant', $3, $4, $5, $6) RETURNING id",
+                        "SELECT $1, $2::jsonb, 'assistant', $3, $4, $5, $6 "
+                        "WHERE NOT EXISTS (SELECT 1 FROM messages WHERE conversation_id = $1 AND role = 'assistant') "
+                        "RETURNING id",
                         conv_id, _content_json, _facilitator,
                         _prompt_tokens, _completion_tokens, _model_used,
                     )
-                    _msg_id = _msg_row["id"]
                     await conn.execute(
                         "UPDATE conversations SET welcome_message_status = $1 WHERE id = $2",
                         'ai_ready',
                         conv_id,
                     )
+                    if not _msg_row:
+                        log_session.info("welcome-bg: committed start opening already exists for conv=%s", conv_id)
+                        return
+                    _msg_id = _msg_row["id"]
                     if _cost_usd > 0:
                         await conn.execute(
                             "UPDATE conversations SET total_cost_usd = total_cost_usd + $1 WHERE id = $2",
@@ -7412,8 +7428,11 @@ async def edge_function(func_name: str, request: Request):
             except (TypeError, ValueError):
                 raise HTTPException(400, detail={"code": "invalid_conversation_id", "message": "A valid conversation ID is required."})
             await _require_conversation_host_access(request, lifecycle_conversation_id)
-            asyncio.create_task(_maybe_generate_welcome_message(lifecycle_conversation_id))
-            return {"success": True, "scheduled": True, "reason": "server_owned_welcome"}
+            # Atomic start-session now persists the first assistant message in
+            # the same transaction as activation. Older clients may still call
+            # this compatibility route, but it must never schedule a competing
+            # welcome task after that durable lifecycle boundary.
+            return {"success": True, "skipped": True, "reason": "start_session_endpoint_required"}
 
         # ── SECURITY LAYER 1: JWT Authentication ──────────────────────────────
         # Extract the caller's identity from the JWT in the Authorization header.

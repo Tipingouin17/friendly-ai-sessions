@@ -26,7 +26,7 @@ assert.match(startBody, /UPDATE conversations\s+SET session_started = TRUE,\s+st
 assert.doesNotMatch(startBody, /session_started_at/);
 assert.match(startBody, /AND COALESCE\(is_session_ended, FALSE\) = FALSE/);
 assert.match(startBody, /RETURNING id, session_started, status, is_session_ended, welcome_message_status/);
-assert.match(startBody, /async with start_conn\.transaction\(\):/);
+assert.match(startBody, /async with _bounded_lifecycle_transaction\(start_conn, "start session"\):/);
 assert.match(startBody, /INSERT INTO messages \(conversation_id, content, role, name\)/);
 assert.match(startBody, /"welcome": "committed"/);
 assert.doesNotMatch(startBody, /await _maybe_generate_welcome_message\(start_conversation_id\)/);

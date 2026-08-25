@@ -980,14 +980,44 @@ async def _acquire_lifecycle_connection(operation: str):
             detail={"code": "session_service_unavailable", "message": "The session service is temporarily unavailable. Please try again shortly."},
         )
     try:
+        # The acquisition budget deliberately ends before yielding. A caller may
+        # hold the returned connection inside an explicit transaction; wrapping
+        # that caller body in this timeout would cancel asyncpg cleanup mid-
+        # transaction and can reset the browser response instead of returning a
+        # structured lifecycle error.
         async with asyncio.timeout(8):
-            async with _pool.acquire() as conn:
-                yield conn
+            conn = await _pool.acquire()
     except TimeoutError as exc:
-        log_session.warning("session lifecycle database operation timed out: %s", operation)
+        log_session.warning("session lifecycle database acquisition timed out: %s", operation)
         raise HTTPException(
             503,
             detail={"code": "session_service_busy", "message": "The session service is busy. Please wait a few seconds and try again."},
+        ) from exc
+
+    try:
+        yield conn
+    finally:
+        await _pool.release(conn)
+
+
+@asynccontextmanager
+async def _bounded_lifecycle_transaction(conn: asyncpg.Connection, operation: str, statement_timeout_ms: int = 6000):
+    """Run interactive lifecycle SQL with a database-side lock/query budget.
+
+    The pool-acquisition budget is handled separately. This wrapper scopes
+    PostgreSQL's statement timeout to one transaction so a lock or slow query
+    rolls back cleanly and returns a structured retryable HTTP response rather
+    than cancelling the enclosing ASGI request.
+    """
+    try:
+        async with conn.transaction():
+            await conn.execute(f"SET LOCAL statement_timeout = '{int(statement_timeout_ms)}'")
+            yield conn
+    except asyncpg.PostgresError as exc:
+        log_session.warning("session lifecycle transaction failed: %s: %s", operation, exc)
+        raise HTTPException(
+            503,
+            detail={"code": "session_lifecycle_busy", "message": "The session is temporarily busy. Please wait a few seconds and try again."},
         ) from exc
 
 
@@ -4296,20 +4326,29 @@ async def _require_conversation_host_access(request: Request, conversation_id: i
     # obey the same bounded pool-acquisition contract as start/stop so an
     # exhausted pool returns a retryable 503 instead of leaving the browser
     # request pending before the durable lifecycle transaction can begin.
-    async with _acquire_lifecycle_connection("host authorization") as conn:
-        allowed = await conn.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1
-                FROM public.conversations c
-                LEFT JOIN public.profiles p ON p.id = $2::uuid
-                WHERE c.id = $1
-                  AND (c.user_id = $2::uuid OR p.role = 'admin')
-            )
-            """,
-            conv_id,
-            str(user_id),
-        )
+    try:
+        async with _acquire_lifecycle_connection("host authorization") as conn:
+            async with conn.transaction():
+                await conn.execute("SET LOCAL statement_timeout = '5000'")
+                allowed = await conn.fetchval(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM public.conversations c
+                        LEFT JOIN public.profiles p ON p.id = $2::uuid
+                        WHERE c.id = $1
+                          AND (c.user_id = $2::uuid OR p.role = 'admin')
+                    )
+                    """,
+                    conv_id,
+                    str(user_id),
+                )
+    except asyncpg.PostgresError as exc:
+        log_session.warning("host authorization database work failed for conv=%s: %s", conv_id, exc)
+        raise HTTPException(
+            503,
+            detail={"code": "host_authorization_busy", "message": "Host access is temporarily busy. Please wait a few seconds and try again."},
+        ) from exc
     if not allowed:
         raise HTTPException(status_code=403, detail="Host or administrator access is required")
     return user
@@ -7193,7 +7232,7 @@ async def edge_function(func_name: str, request: Request):
         # detached task that can stall on context, provider, or worker failures.
         welcome_message_payload = None
         async with _acquire_lifecycle_connection("start session") as start_conn:
-            async with start_conn.transaction():
+            async with _bounded_lifecycle_transaction(start_conn, "start session"):
                 started_row = await start_conn.fetchrow(
                     """
                     UPDATE conversations

@@ -85,6 +85,8 @@ class FakeConnection:
 
     async def execute(self, sql: str, *args: Any):
         compact = " ".join(sql.split())
+        if compact.startswith("SET LOCAL statement_timeout"):
+            return "SET"
         if compact.startswith("UPDATE conversations SET welcome_message_status = $1"):
             self.db.status_updates.append(args)
             return "UPDATE 1"
@@ -100,6 +102,11 @@ class FakeAcquire:
     def __init__(self, db: FakeDB):
         self.connection = FakeConnection(db)
 
+    def __await__(self):
+        async def resolve_connection():
+            return self.connection
+        return resolve_connection().__await__()
+
     async def __aenter__(self):
         return self.connection
 
@@ -113,6 +120,9 @@ class FakePool:
 
     def acquire(self):
         return FakeAcquire(self.db)
+
+    async def release(self, _connection: FakeConnection):
+        return None
 
 
 async def main() -> None:

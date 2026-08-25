@@ -52,9 +52,25 @@ class FakeDB:
     conversation_exists: bool = True
 
 
+class FakeTransaction:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
 class FakeConnection:
     def __init__(self, db: FakeDB):
         self.db = db
+
+    def transaction(self):
+        return FakeTransaction()
+
+    async def execute(self, sql: str, *args):
+        if "SET LOCAL statement_timeout" in sql:
+            return "SET"
+        raise AssertionError(f"Unhandled execute SQL in harness: {' '.join(sql.split())}")
 
     async def fetchval(self, sql: str, *args):
         compact_sql = " ".join(sql.split())
@@ -87,6 +103,11 @@ class FakeAcquire:
     def __init__(self, db: FakeDB):
         self.conn = FakeConnection(db)
 
+    def __await__(self):
+        async def resolve_connection():
+            return self.conn
+        return resolve_connection().__await__()
+
     async def __aenter__(self):
         return self.conn
 
@@ -100,6 +121,9 @@ class FakePool:
 
     def acquire(self):
         return FakeAcquire(self.db)
+
+    async def release(self, _conn: FakeConnection):
+        return None
 
 
 class FakeRequest:

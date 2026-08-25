@@ -52,6 +52,9 @@ assertContains(fastApiServer, 'Welcome to "{_session_title}"!', 'welcome uses a 
 assertContains(fastApiServer, 'async with start_conn.transaction():', 'start-session wraps activation and welcome persistence in one transaction');
 assertContains(fastApiServer, "INSERT INTO messages (conversation_id, content, role, name)", 'start-session writes the deterministic welcome row directly');
 assertContains(fastApiServer, '"welcome": "committed"', 'start-session reports a committed rather than scheduled opening');
+assertContains(fastApiServer, 'async def _broadcast_started_room()', 'start-session isolates non-durable realtime fan-out from its HTTP response');
+assertContains(fastApiServer, 'asyncio.create_task(_broadcast_started_room())', 'start-session schedules realtime delivery only after its transaction commits');
+assertContains(fastApiServer, 'A stale legacy WebSocket may block send_json()', 'start-session documents why lifecycle acknowledgement must not await fan-out');
 assertNotContains(fastApiServer, 'await _maybe_generate_welcome_message(start_conversation_id)', 'start-session never relies on detached welcome generation');
 assertContains(fastApiServer, "'fallback_ready' if _used_fallback else 'ai_ready'", 'welcome persists a terminal fallback-ready status');
 assertContains(fastApiServer, "WHERE id = $1 AND welcome_message_status = 'ai_generating'", 'welcome failure releases only its active generation claim');

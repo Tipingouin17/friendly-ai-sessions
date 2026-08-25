@@ -7274,28 +7274,37 @@ async def edge_function(func_name: str, request: Request):
 
         started_payload = serialize_row(dict(started_row))
         started_payload["welcome_message_status"] = "fallback_ready" if welcome_message_payload else started_payload.get("welcome_message_status")
-        try:
-            await manager.broadcast(str(start_conversation_id), {
-                "event": "INSERT",
-                "payload": {
-                    "eventType": "INSERT",
-                    "new": welcome_message_payload,
-                    "table": "messages",
-                    "schema": "public",
-                },
-            })
-            await manager.broadcast(str(start_conversation_id), {
-                "event": "UPDATE",
-                "payload": {
-                    "eventType": "UPDATE",
-                    "new": started_payload,
-                    "old": {"session_started": False},
-                    "table": "conversations",
-                    "schema": "public",
-                },
-            })
-        except Exception as broadcast_error:
-            log_session.warning("start-session broadcast recovery required for conv=%s: %s", start_conversation_id, broadcast_error)
+        # Realtime delivery is a recovery path, not part of the HTTP lifecycle
+        # acknowledgement. A stale legacy WebSocket may block send_json(), so
+        # waiting for fan-out here can strand the host on a still-enabled Start
+        # button even though the database transaction has completed. Clients
+        # receive the committed response immediately and can also recover by
+        # polling; the guarded background fan-out accelerates live updates.
+        async def _broadcast_started_room() -> None:
+            try:
+                await manager.broadcast(str(start_conversation_id), {
+                    "event": "INSERT",
+                    "payload": {
+                        "eventType": "INSERT",
+                        "new": welcome_message_payload,
+                        "table": "messages",
+                        "schema": "public",
+                    },
+                })
+                await manager.broadcast(str(start_conversation_id), {
+                    "event": "UPDATE",
+                    "payload": {
+                        "eventType": "UPDATE",
+                        "new": started_payload,
+                        "old": {"session_started": False},
+                        "table": "conversations",
+                        "schema": "public",
+                    },
+                })
+            except Exception as broadcast_error:
+                log_session.warning("start-session broadcast recovery required for conv=%s: %s", start_conversation_id, broadcast_error)
+
+        asyncio.create_task(_broadcast_started_room())
         return {
             "success": True,
             "conversation": started_payload,

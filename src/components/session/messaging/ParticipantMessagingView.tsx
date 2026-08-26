@@ -1194,12 +1194,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       .slice(-8);
   }, [isOpenDiscussionMode, messages]);
 
-  const renderPeoplePanel = (panelVariant: 'desktop' | 'mobile') => {
-    const isMobilePanel = panelVariant === 'mobile';
+  const renderPeoplePanel = (panelVariant: 'desktop' | 'mobile-primary') => {
+    const isMobilePrimary = panelVariant === 'mobile-primary';
 
     return (
       <div
-        className={isMobilePanel ? 'flex max-h-[42dvh] min-h-[180px] flex-col overflow-hidden p-2' : 'flex min-h-0 flex-1 flex-col p-3'}
+        className={isMobilePrimary ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-2' : 'flex min-h-0 flex-1 flex-col p-3'}
         data-camera-toggle={`participant-${panelVariant}-preview`}
       >
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -1214,11 +1214,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     );
   };
 
-  const renderChatPanel = (panelVariant: 'desktop' | 'mobile') => {
-    const isMobilePanel = panelVariant === 'mobile';
+  const renderChatPanel = (panelVariant: 'desktop' | 'mobile-primary') => {
+    const isMobilePrimary = panelVariant === 'mobile-primary';
 
     return (
-      <div className={isMobilePanel ? 'max-h-[42dvh] min-h-[180px] overflow-y-auto overscroll-contain p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
+      <div className={isMobilePrimary ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
         {recentChatMessages.length > 0 ? (
           <div className="space-y-3">
             {recentChatMessages.map((message) => (
@@ -1243,6 +1243,107 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   };
 
   const isAudioPlaybackBusy = voiceRuntime.playbackState === 'preparing' || voiceRuntime.playbackState === 'playing';
+
+  const renderParticipantComposer = (compactParticipantDock = false) => (
+    <InputFooter
+      participantCount={maxParticipants}
+      currentParticipant={effectiveParticipantId}
+      participantNames={participantNames}
+      participants={participantPeers}
+      inputMessage={inputMessage}
+      setInputMessage={setInputMessage}
+      onSendMessage={() => { void handleModeAwareTextSubmit(); }}
+      isRecording={isRecording}
+      setIsRecording={setIsRecording}
+      currentUserParticipantId={effectiveParticipantId}
+      isAnonymous={isAnonymous}
+      toggleAnonymous={toggleAnonymous}
+      hasAnswered={hasAnswered || (!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice))}
+      totalResponses={totalResponses}
+      viewMode={viewMode}
+      messages={messages}
+      showResponseStats={showResponseStats}
+      conversationId={conversationId}
+      speechEnabled={speechStackEnabled && !aiIsSpeaking}
+      speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
+      onSpeechInterim={handleSpeechInterim}
+      onSpeechFinal={handleSpeechFinal}
+      placeholder={effectiveModePlaceholder}
+      disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${effectiveModeLabel} response registered. Waiting for the facilitator to continue…` : effectiveModePlaceholder}
+      disabled={modeComposerDisabled}
+      modeContext={activeMode || isOpenDiscussionMode || techniqueModeContext ? {
+        label: effectiveModeLabel,
+        instruction: effectiveModeInstruction,
+        component: techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeComposerComponent,
+        modeKey: effectiveModeKey,
+        stateLabel: techniqueModeContext && !activeMode
+          ? 'Selected facilitation technique'
+          : isOpenDiscussionMode
+            ? activeMode
+              ? 'Open floor'
+              : 'Default open floor'
+            : hasRegisteredResponse || hasSubmittedModeChoice
+              ? 'Response registered'
+              : modeCanSubmit
+                ? isRoundRobinMode && !participantModeState?.is_current_speaker
+                  ? 'Waiting for your turn'
+                  : 'Ready for your input'
+                : 'Not open yet',
+        isComplete: !isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice),
+      } : undefined}
+      modeOptions={modeChoices}
+      selectedModeOptionId={submittedChoiceId}
+      submittingModeOptionId={submittingChoiceId}
+      modeCanSubmit={modeCanSubmit}
+      participantModeState={participantModeState}
+      modeInputError={modeInputError}
+      onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
+      onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
+      handRaiseState={
+        participantModeState?.is_current_speaker || participantModeState?.can_speak
+          ? 'floor_granted'
+          : localDebateHandRaised || Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)
+            ? 'raised'
+            : 'idle'
+      }
+      floorGranted={Boolean(participantModeState?.is_current_speaker || participantModeState?.can_speak)}
+      onHandRaiseToggle={async (raised) => {
+        if (!activeMode || !effectiveParticipantId) return;
+        const previousHandRaised = localDebateHandRaised;
+        setLocalDebateHandRaised(raised);
+        try {
+          await updateModeParticipantState({
+            conversationId,
+            activeModeId: activeMode.id,
+            participantId: effectiveParticipantId,
+            state: { ...(participantModeState?.state as Record<string, unknown> | undefined), hand_raised: raised },
+            canSpeak: false,
+            isCurrentSpeaker: false,
+            canSubmit: true,
+            allowedActions: raised ? ['lower_hand'] : ['raise_hand'],
+          });
+        } catch (error) {
+          setLocalDebateHandRaised(previousHandRaised);
+          console.warn('Unable to update Debate hand-raise state:', error);
+        }
+      }}
+      onReaction={(reaction) => {
+        if (isOpenDiscussionMode && submitModeInput) {
+          void submitModeInput({
+            participantId: effectiveParticipantId,
+            inputType: 'reaction',
+            content: { reaction, modeKey: effectiveModeKey, source: 'participant_quick_reaction' },
+            visibility: 'public',
+          }).catch((error) => {
+            console.warn('Unable to submit Open Discussion quick reaction:', error);
+          });
+        } else {
+          console.info('Participant quick reaction', { reaction, modeKey: effectiveModeKey });
+        }
+      }}
+      compactParticipantDock={compactParticipantDock && isOpenDiscussionMode}
+    />
+  );
 
   return (
     <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900">
@@ -1277,7 +1378,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     : !lastAssistantMessage ? 'Facilitator welcome is preparing'
                     : 'Facilitator audio is ready'}
                 </p>
-                <p className="text-xs leading-relaxed opacity-80">
+                <p className={`text-xs leading-relaxed opacity-80 ${audioUnlocked && voiceRuntime.playbackState === 'idle' ? 'hidden md:block' : ''}`}>
                   {!ttsAvatarEnabled ? 'Voice was disabled in the session configuration.'
                     : !audioUnlocked ? 'Tap Enable ElevenLabs audio once, then every facilitator reply can play on this phone.'
                     : voiceRuntime.playbackError ?? (lastAssistantMessage ? 'Use Play latest reply to hear the most recent facilitator message.' : 'Audio is prepared; the welcome will play when it is available.')}
@@ -1348,7 +1449,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             </button>
           </div>
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
+        <div className="hidden mt-2 grid grid-cols-2 gap-2 md:hidden">
           <button
             type="button"
             onClick={handleToggleLocalCameraClick}
@@ -1369,7 +1470,37 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-2 p-2 md:gap-3 md:p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:hidden">
+        <details className="session-glass-panel shrink-0 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-slate-700">
+            <span className="min-w-0 truncate">{effectiveModeLabel} · {facilitatorTurnStatus}</span>
+            <span className="shrink-0 text-indigo-600">Session details</span>
+          </summary>
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <p className="text-sm leading-relaxed text-slate-700">{latestAssistantMessage?.content || activeMode?.prompt || 'The facilitator is preparing a welcome message for the room.'}</p>
+            {(activeMode || techniqueModeContext) && <p className="mt-2 text-xs leading-relaxed text-slate-500">{effectiveModeInstruction}</p>}
+          </div>
+        </details>
+        <section className="session-glass-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.5rem]" aria-label={sidebarTab === 'chat' ? 'Conversation' : 'People and video'}>
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2">
+            <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Conversation'}</span>
+            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount} of ${maxParticipants} seats` : `${recentChatMessages.length} recent`}</span>
+          </div>
+          {sidebarTab === 'people' ? renderPeoplePanel('mobile-primary') : renderChatPanel('mobile-primary')}
+        </section>
+        {isSessionEnded ? (
+          <div className="shrink-0 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="text-sm font-semibold text-amber-950">This session has ended</p>
+            <p className="mt-1 text-xs text-amber-700">Thank you for your participation.</p>
+          </div>
+        ) : (
+          <div className="shrink-0 border-t border-slate-200 bg-white/95 shadow-[0_-8px_20px_rgba(15,23,42,0.06)]">
+            {renderParticipantComposer(true)}
+          </div>
+        )}
+      </div>
+
+      <div className="hidden min-h-0 flex-1 gap-2 p-2 md:flex md:gap-3 md:p-3">
         <main className="session-glass-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] md:rounded-[2rem]">
           <section className="min-h-0 flex-1 overflow-y-auto p-2 md:p-4">
             <div className="session-soft-panel rounded-2xl p-3 md:p-4">
@@ -1470,108 +1601,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="shrink-0 border-t border-slate-200 bg-white/90 md:block">
-              <InputFooter
-                participantCount={maxParticipants}
-                currentParticipant={effectiveParticipantId}
-                participantNames={participantNames}
-                participants={participantPeers}
-                inputMessage={inputMessage}
-                setInputMessage={setInputMessage}
-                onSendMessage={() => { void handleModeAwareTextSubmit(); }}
-                isRecording={isRecording}
-                setIsRecording={setIsRecording}
-                currentUserParticipantId={effectiveParticipantId}
-                isAnonymous={isAnonymous}
-                toggleAnonymous={toggleAnonymous}
-                hasAnswered={hasAnswered || (!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice))}
-                totalResponses={totalResponses}
-                viewMode={viewMode}
-                messages={messages}
-                showResponseStats={showResponseStats}
-                conversationId={conversationId}
-                speechEnabled={speechStackEnabled && !aiIsSpeaking}
-                speechLanguage={phase3Settings?.speech_default_language || conversationData?.language || 'en-US'}
-                onSpeechInterim={handleSpeechInterim}
-                onSpeechFinal={handleSpeechFinal}
-                placeholder={effectiveModePlaceholder}
-                disabledPlaceholder={!isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice) ? `${effectiveModeLabel} response registered. Waiting for the facilitator to continue…` : effectiveModePlaceholder}
-                disabled={modeComposerDisabled}
-                modeContext={activeMode || isOpenDiscussionMode || techniqueModeContext ? {
-                  label: effectiveModeLabel,
-                  instruction: effectiveModeInstruction,
-                  component: techniqueModeContext && !activeMode ? techniqueModeContext.modeKey : modeComposerComponent,
-                  modeKey: effectiveModeKey,
-                  stateLabel: techniqueModeContext && !activeMode
-                    ? 'Selected facilitation technique'
-                    : isOpenDiscussionMode
-                      ? activeMode
-                        ? 'Open floor'
-                        : 'Default open floor'
-                      : hasRegisteredResponse || hasSubmittedModeChoice
-                        ? 'Response registered'
-                        : modeCanSubmit
-                          ? isRoundRobinMode && !participantModeState?.is_current_speaker
-                            ? 'Waiting for your turn'
-                            : 'Ready for your input'
-                          : 'Not open yet',
-                  isComplete: !isOpenDiscussionMode && (hasRegisteredResponse || hasSubmittedModeChoice),
-                } : undefined}
-                modeOptions={modeChoices}
-                selectedModeOptionId={submittedChoiceId}
-                submittingModeOptionId={submittingChoiceId}
-                modeCanSubmit={modeCanSubmit}
-                participantModeState={participantModeState}
-                modeInputError={modeInputError}
-                onVote={(choice) => void handleSubmitModeChoice(choice, 'vote')}
-                onWordPick={(choice) => void handleSubmitModeChoice(choice, 'reflection_word')}
-                handRaiseState={
-                  participantModeState?.is_current_speaker || participantModeState?.can_speak
-                    ? 'floor_granted'
-                    : localDebateHandRaised || Boolean((participantModeState?.state as Record<string, unknown> | undefined)?.hand_raised)
-                      ? 'raised'
-                      : 'idle'
-                }
-                floorGranted={Boolean(participantModeState?.is_current_speaker || participantModeState?.can_speak)}
-                onHandRaiseToggle={async (raised) => {
-                  if (!activeMode || !effectiveParticipantId) return;
-                  const previousHandRaised = localDebateHandRaised;
-                  setLocalDebateHandRaised(raised);
-                  try {
-                    await updateModeParticipantState({
-                      conversationId,
-                      activeModeId: activeMode.id,
-                      participantId: effectiveParticipantId,
-                      state: { ...(participantModeState?.state as Record<string, unknown> | undefined), hand_raised: raised },
-                      canSpeak: false,
-                      isCurrentSpeaker: false,
-                      canSubmit: true,
-                      allowedActions: raised ? ['lower_hand'] : ['raise_hand'],
-                    });
-                  } catch (error) {
-                    setLocalDebateHandRaised(previousHandRaised);
-                    console.warn('Unable to update Debate hand-raise state:', error);
-                  }
-                }}
-                onReaction={(reaction) => {
-                  if (isOpenDiscussionMode && submitModeInput) {
-                    void submitModeInput({
-                      participantId: effectiveParticipantId,
-                      inputType: 'reaction',
-                      content: {
-                        reaction,
-                        modeKey: effectiveModeKey,
-                        source: 'participant_quick_reaction',
-                      },
-                      visibility: 'public',
-                    }).catch((error) => {
-                      console.warn('Unable to submit Open Discussion quick reaction:', error);
-                    });
-                  } else {
-                    console.info('Participant quick reaction', { reaction, modeKey: effectiveModeKey });
-                  }
-                }}
-              />
+            <div className="shrink-0 border-t border-slate-200 bg-white/90">
+              {renderParticipantComposer()}
             </div>
           )}
         </main>
@@ -1598,16 +1629,6 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
           {sidebarTab === 'people' ? renderPeoplePanel('desktop') : renderChatPanel('desktop')}
         </aside>
-      </div>
-
-      <div className="shrink-0 border-t border-slate-200 bg-white/95 px-2 py-2 md:hidden">
-        <div className="session-glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/40">
-          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5">
-            <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Chat'}</span>
-            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount} of ${maxParticipants} seats joined` : `${recentChatMessages.length} recent`}</span>
-          </div>
-          {sidebarTab === 'people' ? renderPeoplePanel('mobile') : renderChatPanel('mobile')}
-        </div>
       </div>
 
       <div className="relative z-20 grid shrink-0 grid-cols-2 border-t border-slate-200 bg-white/95 p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden">

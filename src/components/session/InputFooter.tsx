@@ -91,6 +91,8 @@ interface InputFooterProps {
   onReaction?: (reaction: string) => void | Promise<void>;
   handRaiseState?: HandRaiseState;
   onHandRaiseToggle?: (raised: boolean) => void | Promise<void>;
+  /** Used only by the phone reply-first room shell; desktop and structured modes keep their full panels. */
+  compactParticipantDock?: boolean;
 }
 
 const REACTIONS = ['✋', '👋', '👍', '❓'] as const;
@@ -241,6 +243,7 @@ const InputFooter = ({
   onReaction,
   handRaiseState = 'idle',
   onHandRaiseToggle,
+  compactParticipantDock = false,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -347,26 +350,42 @@ const InputFooter = ({
     />
   ) : null;
 
-  const renderOpenDiscussionPanel = () => (
-    <div className="mx-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm sm:mx-4">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ${isRecording ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.3)]' : 'border-indigo-200 bg-indigo-50 text-indigo-600'}`}>
-            <Mic className="h-5 w-5" />
+  const renderOpenDiscussionPanel = () => {
+    const chatInput = <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />;
+
+    if (compactParticipantDock) {
+      return (
+        <div className="px-2 pb-1 pt-2" aria-label="Reply composer">
+          <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+            <span className="text-xs font-bold text-slate-700">Reply to the discussion</span>
+            <span className={`text-[11px] font-semibold ${isRecording ? 'text-emerald-700' : 'text-slate-500'}`}>{isRecording ? 'Listening…' : 'Type or use the microphone'}</span>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-black text-slate-950">You're live — speak freely</p>
-            <p className="text-xs leading-relaxed text-slate-600">The AI facilitator is listening to the room. Everyone can speak at the same time.</p>
+          {chatInput}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mx-3 rounded-2xl border border-indigo-100 bg-white p-3 shadow-sm sm:mx-4">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors ${isRecording ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.3)]' : 'border-indigo-200 bg-indigo-50 text-indigo-600'}`}>
+              <Mic className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-950">You're live — speak freely</p>
+              <p className="text-xs leading-relaxed text-slate-600">The AI facilitator is listening to the room. Everyone can speak at the same time.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Click mic to speak'} />
+            <QuickReactions onReaction={onReaction} compact={isMobile} />
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Click mic to speak'} />
-          <QuickReactions onReaction={onReaction} compact={isMobile} />
-        </div>
+        {chatInput}
       </div>
-      <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
-    </div>
-  );
+    );
+  };
 
   const renderRoundRobinPanel = () => {
     const isCurrent = Boolean(participantModeState?.is_current_speaker);

@@ -51,7 +51,8 @@ assertContains(participantView, 'Math.max(isOpenDiscussionMode ? responseCount :
 assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'participant people/chat sidebar contract');
 assertContains(participantView, "aria-pressed={sidebarTab === 'people'}", 'participant mobile People tab exposes active pressed state');
 assertContains(participantView, "aria-pressed={sidebarTab === 'chat'}", 'participant mobile Chat tab exposes active pressed state');
-assertContains(participantView, "{sidebarTab === 'people' ? renderPeoplePanel('mobile') : renderChatPanel('mobile')}", 'participant mobile tabs render a visible People or Chat panel');
+assertContains(participantView, "{sidebarTab === 'people' ? renderPeoplePanel('mobile-primary') : renderChatPanel('mobile-primary')}", 'participant mobile tabs render a visible People or Chat primary viewport');
+assertContains(participantView, 'renderParticipantComposer(true)', 'participant mobile shell keeps the reply composer docked after either tab surface');
 assertContains(participantView, '<SessionVideoGrid', 'participant People tab multi-video grid integration');
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');
 assertContains(participantView, 'participantVideoTiles', 'participant data-driven video tile mapping');

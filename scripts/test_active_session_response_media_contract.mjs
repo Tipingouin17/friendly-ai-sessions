@@ -142,7 +142,17 @@ assertContains(participantView, 'manualReplayInProgressRef', 'mobile replay has 
 assertContains(participantView, 'disabled={isAudioPlaybackBusy}', 'mobile replay is disabled while preparing or playing');
 assertNotContains(participantView, 'line-clamp-4 text-xs leading-relaxed text-slate-700', 'mobile chat never truncates a facilitator message after four lines');
 assertContains(participantView, 'whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-700', 'mobile chat preserves full wrapped text');
-assertContains(participantView, 'max-h-[42dvh] min-h-[180px] overflow-y-auto overscroll-contain', 'mobile chat has a readable constrained scroll surface');
+assertNotContains(participantView, 'max-h-[42dvh] min-h-[180px] overflow-y-auto overscroll-contain', 'mobile chat is never capped into a separate card above the composer');
+assertContains(participantView, 'flex min-h-0 flex-1 flex-col gap-2 p-2 md:hidden', 'mobile participant shell owns one flexible primary viewport');
+assertContains(participantView, "renderChatPanel('mobile-primary')", 'mobile chat is rendered in the primary flexible viewport');
+assertContains(participantView, "renderPeoplePanel('mobile-primary')", 'people and video reuse the primary viewport rather than adding a second stacked card');
+assertContains(participantView, 'renderParticipantComposer(true)', 'mobile reply dock is rendered immediately after the primary viewport');
+assertContains(inputFooter, 'Reply to the discussion', 'mobile reply dock has a clear primary-task label');
+assertContains(participantView, 'Session details', 'secondary session context uses a single explicit progressive-disclosure control');
+assertContains(participantView, "audioUnlocked && voiceRuntime.playbackState === 'idle' ? 'hidden md:block'", 'ready audio guidance compacts on phones after the initial enable action');
+assertContains(participantView, 'className="hidden mt-2 grid grid-cols-2 gap-2 md:hidden"', 'duplicate mobile camera-state cards do not consume the initial reply viewport');
+assertContains(inputFooter, 'compactParticipantDock?: boolean;', 'input footer supports the participant phone reply dock without a second composer implementation');
+assertContains(inputFooter, 'aria-label="Reply composer"', 'compact phone composer remains discoverable to assistive technology');
 
 // A full room may become ready, but only the host may call the atomic start endpoint.
 assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start hook cannot call the host start operation');

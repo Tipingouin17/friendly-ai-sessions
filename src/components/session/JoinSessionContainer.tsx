@@ -17,6 +17,7 @@ import { useJoinSessionNavigation } from "@/hooks/useJoinSessionNavigation";
 import { useJoinSessionState } from "@/hooks/useJoinSessionState";
 import JoinSessionErrorState from "./JoinSessionErrorState";
 import JoinSessionMain from "./JoinSessionMain";
+import { isOrdinalParticipantLabel } from "@/utils/inputValidation";
 import SessionFullPage from "./SessionFullPage";
 
 /** Shared page shell so every full-page state looks identical */
@@ -164,10 +165,17 @@ const JoinSessionContainer = () => {
     }
   }, [checkNavigationState, setShowRejoinPrompt]);
 
-  // Auto-redirect if session exists (but NOT if session is completed)
-  // Suppress the rejoin prompt flash: if auto-redirect will fire, skip the prompt entirely
+  // A legacy ordinal label must be corrected in the visible join form before
+  // re-entry. All other persisted device-bound identities may still rejoin
+  // immediately without a disruptive confirmation step.
+  const requiresDisplayNameCorrection = Boolean(
+    existingSessionData && isOrdinalParticipantLabel(existingSessionData.name)
+  );
+
+  // Auto-redirect if session exists (but NOT if session is completed or its
+  // stored identity must be repaired).
   useEffect(() => {
-    if (existingSessionData && conversationId && !checkNavigationState()) {
+    if (existingSessionData && conversationId && !requiresDisplayNameCorrection && !checkNavigationState()) {
       // Don't auto-redirect to a completed session
       if (conversation && (conversation.status === 'completed' || conversation.is_session_ended)) {
         return;
@@ -176,7 +184,7 @@ const JoinSessionContainer = () => {
       setShowRejoinPrompt(false);
       handleRejoin();
     }
-  }, [existingSessionData, conversationId, checkNavigationState, handleRejoin, conversation, setShowRejoinPrompt]);
+  }, [existingSessionData, conversationId, requiresDisplayNameCorrection, checkNavigationState, handleRejoin, conversation, setShowRejoinPrompt]);
 
   // CRITICAL: Check navigation state again before any rendering
   if (checkNavigationState()) {

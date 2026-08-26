@@ -31,6 +31,8 @@ const sessionState = read('src/hooks/useSessionState.ts');
 const sessionTimer = read('src/hooks/useSessionTimer.ts');
 const joinSessionMain = read('src/components/session/JoinSessionMain.tsx');
 const joinSessionData = read('src/hooks/useJoinSessionData.ts');
+const joinSessionContainer = read('src/components/session/JoinSessionContainer.tsx');
+const participantJoining = read('src/hooks/session-joining/useParticipantJoining.ts');
 const inputValidation = read('src/utils/inputValidation.ts');
 
 // Voice and typed turns share one durable message boundary.
@@ -62,6 +64,10 @@ assertContains(joinSessionMain, 'placeholder="For example, Maya Chen"', 'QR form
 assertContains(joinSessionMain, '“Participant 1” is only an internal seat label.', 'QR form explains why ordinal participant labels cannot be used');
 assertContains(joinSessionMain, 'Use your display name to continue', 'QR form prevents an ordinal label from looking join-ready');
 assertContains(fastApiServer, 'participant_name must be a real display name, not a numbered participant label', 'atomic join endpoint rejects ordinal labels that bypass the client');
+assertContains(joinSessionContainer, 'const requiresDisplayNameCorrection', 'legacy ordinal identities keep the QR form visible on rejoin');
+assertContains(joinSessionContainer, '!requiresDisplayNameCorrection', 'legacy ordinal identities cannot silently auto-redirect back into a session');
+assertContains(participantJoining, 'isOrdinalParticipantLabel(sessionData.name) && !isOrdinalParticipantLabel(participantName)', 'legacy identity correction routes a real name through the device-bound atomic update');
+assertContains(participantJoining, 'updates the existing slot without consuming another seat', 'legacy identity correction documents its capacity-safe rejoin behavior');
 
 // The first room message is availability-critical: it is persisted before any
 // provider completion and can therefore never remain indefinitely in preparation.

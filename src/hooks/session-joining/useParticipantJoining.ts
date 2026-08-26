@@ -11,6 +11,7 @@ import api, { getJoinToken } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { getOrCreateDeviceId } from "@/hooks/useDeviceId";
+import { isOrdinalParticipantLabel } from "@/utils/inputValidation";
 
 interface JoinParticipantParams {
   conversationId: number;
@@ -61,6 +62,14 @@ export function useParticipantJoining() {
       } catch {
         // Network error — optimistically allow rejoin; the backend will
         // handle the device_id lookup and create/reuse the slot.
+      }
+
+      // A historical ordinal label is a recoverable setup defect, not an
+      // identity. Returning null deliberately routes the new real name through
+      // joinAsNewParticipant; the atomic endpoint sees the same device_id and
+      // updates the existing slot without consuming another seat.
+      if (isOrdinalParticipantLabel(sessionData.name) && !isOrdinalParticipantLabel(participantName)) {
+        return null;
       }
 
       updateSessionAccessTime(conversationId);

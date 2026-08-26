@@ -8,6 +8,7 @@ const read = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath)
 const participantView = read('src/components/session/messaging/ParticipantMessagingView.tsx');
 const sessionPage = read('src/pages/Session.tsx');
 const inputFooter = read('src/components/session/InputFooter.tsx');
+const chatInput = read('src/components/chat/ChatInput.tsx');
 const hostContent = read('src/components/session/host/HostSessionContent.tsx');
 const hostMessagingView = read('src/components/session/messaging/SimplifiedHostMessagingView.tsx');
 const hostSessionsDropdown = read('src/components/session/host/SessionsDropdown.tsx');
@@ -59,11 +60,16 @@ assertContains(participantView, 'String(message.participant) === participantKey'
 assertContains(participantView, 'Your response is registered', 'participant visible response confirmation');
 assertContains(participantView, 'effectiveResponseCount', 'participant response counter uses local registration fallback');
 assertContains(participantView, 'Math.max(isOpenDiscussionMode ? responseCount : 0, hasRegisteredResponse ? 1 : 0)', 'participant local response counter preserves own completion without leaking prior open-discussion counts into structured modes');
-assertContains(participantView, "type SidebarTab = 'people' | 'chat'", 'participant people/chat sidebar contract');
+assertContains(participantView, "type SidebarTab = 'activity' | 'conversation' | 'people'", 'participant uses stable Activity, Conversation, and People destinations');
+assertContains(participantView, "React.useState<SidebarTab>(isMobile ? 'activity' : 'conversation')", 'participant defaults phones to the current activity and desktop to conversation context');
+assertContains(participantView, "aria-pressed={sidebarTab === 'activity'}", 'participant mobile Activity tab exposes active pressed state');
+assertContains(participantView, "aria-pressed={sidebarTab === 'conversation'}", 'participant mobile Conversation tab exposes active pressed state');
 assertContains(participantView, "aria-pressed={sidebarTab === 'people'}", 'participant mobile People tab exposes active pressed state');
-assertContains(participantView, "aria-pressed={sidebarTab === 'chat'}", 'participant mobile Chat tab exposes active pressed state');
-assertContains(participantView, "{sidebarTab === 'people' ? renderPeoplePanel('mobile-primary') : renderChatPanel('mobile-primary')}", 'participant mobile tabs render a visible People or Chat primary viewport');
-assertContains(participantView, 'renderParticipantComposer(true)', 'participant mobile shell keeps the reply composer docked after either tab surface');
+assertContains(participantView, "sidebarTab === 'activity' ? renderMobileActivityPanel()", 'participant mobile Activity owns the primary task viewport');
+assertContains(participantView, 'Live transcript is not enabled', 'participant honestly distinguishes durable conversation from unavailable live transcription');
+assertContains(participantView, 'Conversation history is available below.', 'participant explains the available durable context route');
+assertContains(participantView, 'Your response is private until the facilitator combines the group’s answers.', 'silent individual response makes privacy expectation visible before input');
+assertContains(participantView, 'renderParticipantComposer(true, true)', 'participant Activity renders one task-first response flow');
 assertContains(participantView, '<SessionVideoGrid', 'participant People tab multi-video grid integration');
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');
 assertContains(participantView, 'participantVideoTiles', 'participant data-driven video tile mapping');
@@ -112,7 +118,9 @@ assertContains(inputFooter, "modeKey === 'reflection_checkin'", 'adaptive footer
 assertContains(inputFooter, "modeKey === 'debate'", 'adaptive footer renders debate hand-raise panel');
 assertContains(inputFooter, "return renderOpenDiscussionPanel();", 'adaptive footer defaults to open discussion panel');
 assertContains(inputFooter, 'sm:grid-cols-2', 'adaptive footer keeps voting choices responsive across columns');
-assertContains(inputFooter, 'max-h-[260px] overflow-y-auto', 'adaptive footer enforces mobile footer max height with internal scroll');
+assertContains(inputFooter, "taskFirstMobile ? 'pb-2'", 'task-first Activity avoids placing its response flow in a capped nested mobile scroller');
+assertContains(inputFooter, 'Session options', 'secondary participant break, skip, and host-message controls are disclosed on demand');
+assertContains(participantView, 'taskFirstMobile={taskFirstMobile}', 'participant passes task-first mode into the adaptive composer');
 assertContains(inputFooter, 'aria-label={`Vote for ${choice.label}`}', 'adaptive footer gives vote buttons accessible labels');
 assertContains(inputFooter, 'aria-pressed={handRaised || floorGranted}', 'adaptive footer exposes debate hand raise pressed state');
 assertContains(inputFooter, 'Silent response mode is active', 'adaptive footer announces silent response privacy to screen readers');
@@ -125,6 +133,13 @@ assertContains(participantView, 'const messageId = String(lastAssistantMessage.i
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
 assertContains(participantView, 'Enable ElevenLabs audio', 'participant exposes an explicit provider-specific mobile audio-enable state');
 assertContains(participantView, 'Play latest reply', 'participant exposes a visible replay action for facilitator audio');
+assertContains(participantView, 'hasPassiveAudioReadyState', 'participant identifies passive audio-ready state separately from active audio errors');
+assertContains(participantView, "hasPassiveAudioReadyState ? 'hidden md:block' : 'shrink-0'", 'passive audio status does not displace the mobile task viewport');
+assertContains(participantView, 'Play facilitator response', 'Activity retains a compact replay action when passive audio status is hidden on a phone');
+assertContains(chatInput, 'Listening — speak your response', 'voice capture has a dedicated readable recording state');
+assertContains(chatInput, 'Tap Stop to review your draft before sending.', 'voice capture requires participant review before durable send');
+assertContains(chatInput, "disabled={!inputMessage.trim() || disabled || isOverLimit || isRecording}", 'voice capture prevents Send while recognition is active');
+assertNotContains(chatInput, 'absolute bottom-2 left-3 flex items-center', 'voice state no longer overlays the text placeholder');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');
 assertContains(hostContent, 'session-redesign-shell flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-slate-900', 'host redesigned light command-center surface');

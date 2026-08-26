@@ -192,7 +192,7 @@ const ChatInput = ({
         latestConfidenceRef.current = null;
         recognitionRef.current.start();
         setIsRecording(true);
-        toast.info("Listening… speak now, then press Stop or Enter to send.");
+        toast.info("Listening — speak your response, then tap Stop to review before sending.");
       } catch {
         toast.error("Could not start voice input — check your microphone permissions.");
       }
@@ -214,9 +214,8 @@ const ChatInput = ({
   };
 
   const handleSend = () => {
-    if (!inputMessage.trim() || disabled) return;
+    if (!inputMessage.trim() || disabled || isRecording) return;
     if (isOverLimit) return; // hard block at 2000 chars
-    if (isRecording) handleStopRecording({ suppressFinalTranscript: true });
     onSendMessage();
   };
 
@@ -234,31 +233,37 @@ const ChatInput = ({
   return (
     <div className="border-t border-slate-200 bg-white px-2 py-2 sm:px-4 sm:py-3">
       <div className="flex items-end gap-1.5 sm:gap-2">
-        {/* Textarea */}
-        <div className="flex-1 relative">
-          <textarea
-            ref={textareaRef}
-            value={inputMessage}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            aria-label={placeholder || 'Chat message input'}
-            disabled={disabled}
-            rows={1}
-            className={`w-full resize-none rounded-2xl border bg-slate-50 px-3 py-2 text-sm leading-[20px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow sm:px-4 sm:py-3 sm:leading-[22px] ${
-              isOverLimit
-                ? "border-red-400 focus:ring-red-400"
-                : isNearLimit
-                  ? "border-amber-400 focus:ring-amber-400"
-                  : "border-slate-200 focus:ring-indigo-400"
-            }`}
-            style={{ minHeight: '38px', maxHeight: '88px', overflowY: 'auto' }}
-          />
-          {isRecording && (
-            <div className="absolute bottom-2 left-3 flex items-center gap-1.5 text-xs text-red-500 font-medium pointer-events-none">
-              <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-              Listening…
+        {/* Typing and recording are distinct states: dictated text is reviewed before it can be sent. */}
+        <div className="min-w-0 flex-1">
+          {isRecording ? (
+            <div className="flex min-h-[54px] items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5" role="status" aria-live="polite">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500 motion-reduce:animate-none" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-rose-900">Listening — speak your response</span>
+                <span className="block text-xs leading-relaxed text-rose-700">Tap Stop to review your draft before sending.</span>
+              </span>
             </div>
+          ) : (
+            <textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              aria-label={placeholder || 'Chat message input'}
+              disabled={disabled}
+              rows={1}
+              className={`w-full resize-none rounded-2xl border bg-slate-50 px-3 py-2 text-sm leading-[20px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-shadow sm:px-4 sm:py-3 sm:leading-[22px] ${
+                isOverLimit
+                  ? "border-red-400 focus:ring-red-400"
+                  : isNearLimit
+                    ? "border-amber-400 focus:ring-amber-400"
+                    : "border-slate-200 focus:ring-indigo-400"
+              }`}
+              style={{ minHeight: '38px', maxHeight: '88px', overflowY: 'auto' }}
+            />
           )}
         </div>
 
@@ -290,8 +295,8 @@ const ChatInput = ({
         <button
           type="button"
           onClick={handleSend}
-          disabled={!inputMessage.trim() || disabled || isOverLimit}
-          aria-label="Send message"
+          disabled={!inputMessage.trim() || disabled || isOverLimit || isRecording}
+          aria-label={isRecording ? 'Stop voice input before sending' : 'Send message'}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:w-11"
         >
           <Send className="h-5 w-5" />
@@ -305,7 +310,7 @@ const ChatInput = ({
       )}
 
       {/* Character counter — only shown when typing */}
-      {charCount > 0 && (
+      {!isRecording && charCount > 0 && (
         <div className={`mt-1 text-right text-xs pr-1 ${
           isOverLimit
             ? "text-red-500 font-semibold"

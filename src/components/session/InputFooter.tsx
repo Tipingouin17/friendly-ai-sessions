@@ -93,6 +93,8 @@ interface InputFooterProps {
   onHandRaiseToggle?: (raised: boolean) => void | Promise<void>;
   /** Used only by the phone reply-first room shell; desktop and structured modes keep their full panels. */
   compactParticipantDock?: boolean;
+  /** Activity-first phone surface: the parent owns task context and secondary controls are disclosed on demand. */
+  taskFirstMobile?: boolean;
 }
 
 const REACTIONS = ['✋', '👋', '👍', '❓'] as const;
@@ -244,6 +246,7 @@ const InputFooter = ({
   handRaiseState = 'idle',
   onHandRaiseToggle,
   compactParticipantDock = false,
+  taskFirstMobile = false,
 }: InputFooterProps) => {
   const isMobile = useIsMobile();
   const { maxQuestionsPerSession } = usePlanLimits();
@@ -338,7 +341,7 @@ const InputFooter = ({
 
   const renderModeStrip = () => null;
 
-  const renderStageHeader = () => modeContext ? (
+  const renderStageHeader = () => !taskFirstMobile && modeContext ? (
     <ModeStageHeader
       label={modeContext.label}
       instruction={modeContext.instruction}
@@ -495,10 +498,17 @@ const InputFooter = ({
         {isParticipantContext && hasReachedQuestionLimit ? (
           <div className="p-3 sm:p-4 flex flex-col items-center justify-center"><div className="mb-2 flex items-center justify-center gap-2 bg-amber-50 px-3 py-2 rounded-md text-amber-700 border border-amber-200 w-full text-sm"><Lock className="h-4 w-4" /><span className="font-medium">Question limit reached ({maxQuestionsPerSession} per session). <a href="/pricing" className="underline hover:text-amber-900">Upgrade your plan</a> for more.</span></div></div>
         ) : isParticipantContext ? (
-          <div className="max-h-[260px] overflow-y-auto overscroll-contain pb-2 md:max-h-none md:overflow-visible">
+          <div className={`${taskFirstMobile ? 'pb-2' : 'max-h-[260px] overflow-y-auto overscroll-contain pb-2'} md:max-h-none md:overflow-visible`}>
             {renderStageHeader()}<div className={`transition-opacity duration-200 motion-reduce:transition-none ${isPanelFading ? 'opacity-0' : 'opacity-100'}`}>{renderModePanel()}</div>
             {modeInputError && <p className="mx-3 mt-2 text-xs font-semibold text-rose-600 sm:mx-4">{modeInputError}</p>}
-            <ParticipantEngagementControls status={status} onSkip={skipQuestion} onTogglePause={togglePause} onSendHostMessage={sendMessageToHost} isSendingHostMessage={isSendingHostMessage} hostMessageSent={hostMessageSent} hasAnswered={hasAnswered} isMobile={isMobile} />
+            {taskFirstMobile ? (
+              <details className="mx-3 mt-2 rounded-xl border border-slate-200 bg-slate-50 sm:mx-4">
+                <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-600">Session options</summary>
+                <ParticipantEngagementControls status={status} onSkip={skipQuestion} onTogglePause={togglePause} onSendHostMessage={sendMessageToHost} isSendingHostMessage={isSendingHostMessage} hostMessageSent={hostMessageSent} hasAnswered={hasAnswered} isMobile={isMobile} />
+              </details>
+            ) : (
+              <ParticipantEngagementControls status={status} onSkip={skipQuestion} onTogglePause={togglePause} onSendHostMessage={sendMessageToHost} isSendingHostMessage={isSendingHostMessage} hostMessageSent={hostMessageSent} hasAnswered={hasAnswered} isMobile={isMobile} />
+            )}
             {shouldRenderDefaultChatInput && <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />}
             {!modeContext && !isPaused && !isSkipped && <div className="px-3 pb-2 sm:px-4"><QuickReactions onReaction={onReaction} compact={isMobile} /></div>}
           </div>

@@ -70,7 +70,7 @@ interface ParticipantMessagingViewProps {
   }) => Promise<unknown>;
 }
 
-type SidebarTab = 'people' | 'chat';
+type SidebarTab = 'activity' | 'conversation' | 'people';
 type TileConnectionStatus = NonNullable<SessionVideoParticipant['connectionStatus']>;
 
 const getPeerTileConnectionStatus = (peerStatus: WebRTCPeerStatus | undefined, hasStream: boolean): TileConnectionStatus => {
@@ -342,8 +342,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   modeError = null,
   submitModeInput,
 }) => {
-  // On phones the conversation is the primary task; people/video remains one tap away.
-  const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>('chat');
+  // A participant needs one task-first surface, with conversation and people as stable secondary destinations.
+  const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>(isMobile ? 'activity' : 'conversation');
   const [audioUnlocked, setAudioUnlocked] = React.useState(() => {
     // Persist across re-renders within the same browser tab session
     try { return sessionStorage.getItem('mf_audio_unlocked') === '1'; } catch { return false; }
@@ -1219,6 +1219,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     return (
       <div className={isMobilePrimary ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
+        {isMobilePrimary && (
+          <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" role="status">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Captions className="h-3.5 w-3.5 text-slate-500" /> Live transcript is not enabled</div>
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">Conversation history is available below.</p>
+          </div>
+        )}
         {recentChatMessages.length > 0 ? (
           <div className="space-y-3">
             {recentChatMessages.map((message) => (
@@ -1243,8 +1249,61 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   };
 
   const isAudioPlaybackBusy = voiceRuntime.playbackState === 'preparing' || voiceRuntime.playbackState === 'playing';
+  const hasPassiveAudioReadyState = audioUnlocked && voiceRuntime.playbackState === 'idle' && Boolean(lastAssistantMessage);
 
-  const renderParticipantComposer = (compactParticipantDock = false) => (
+  const renderMobileActivityPanel = () => {
+    const activityPrompt = activeMode?.prompt || latestAssistantMessage?.content || 'The facilitator is preparing the next activity.';
+    const activityTitle = isOpenDiscussionMode
+      ? 'Share your perspective'
+      : isSilentResponseMode
+        ? 'Write your private response'
+        : isVotingMode
+          ? 'Make your selection'
+          : isRoundRobinMode
+            ? 'Follow the speaking order'
+            : isReflectionMode
+              ? 'Share a quick check-in'
+              : effectiveModeLabel;
+
+    return (
+      <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2" aria-label="Current activity">
+        <div className="session-soft-panel rounded-[1.5rem] border border-indigo-100 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-800">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+              <span className="truncate">{effectiveModeLabel}</span>
+            </span>
+            <span className="shrink-0 text-xs font-semibold text-slate-500">{facilitatorTurnStatus}</span>
+          </div>
+          <h2 className="mt-4 text-lg font-black tracking-tight text-slate-950">{activityTitle}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">{activityPrompt}</p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-500">{effectiveModeInstruction}</p>
+          {isSilentResponseMode && (
+            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-800">
+              Your response is private until the facilitator combines the group’s answers.
+            </p>
+          )}
+          {hasPassiveAudioReadyState && ttsAvatarEnabled && (
+            <button type="button" onClick={replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-bold text-indigo-800 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60">
+              <Play className="h-3.5 w-3.5 fill-current" /> {isAudioPlaybackBusy ? 'Preparing audio…' : 'Play facilitator response'}
+            </button>
+          )}
+        </div>
+        {isSessionEnded ? (
+          <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="text-sm font-semibold text-amber-950">This session has ended</p>
+            <p className="mt-1 text-xs text-amber-700">Thank you for your participation.</p>
+          </div>
+        ) : (
+          <div className="mt-2 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+            {renderParticipantComposer(true, true)}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const renderParticipantComposer = (compactParticipantDock = false, taskFirstMobile = false) => (
     <InputFooter
       participantCount={maxParticipants}
       currentParticipant={effectiveParticipantId}
@@ -1342,6 +1401,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         }
       }}
       compactParticipantDock={compactParticipantDock && isOpenDiscussionMode}
+      taskFirstMobile={taskFirstMobile}
     />
   );
 
@@ -1352,7 +1412,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         <section
           role="status"
           aria-live="polite"
-          className={`shrink-0 border-b px-3 py-2.5 ${
+          className={`${hasPassiveAudioReadyState ? 'hidden md:block' : 'shrink-0'} border-b px-3 py-2.5 ${
             !ttsAvatarEnabled
               ? 'border-amber-200 bg-amber-50 text-amber-900'
               : voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked'
@@ -1470,33 +1530,15 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:hidden">
-        <details className="session-glass-panel shrink-0 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-slate-700">
-            <span className="min-w-0 truncate">{effectiveModeLabel} · {facilitatorTurnStatus}</span>
-            <span className="shrink-0 text-indigo-600">Session details</span>
-          </summary>
-          <div className="mt-2 border-t border-slate-100 pt-2">
-            <p className="text-sm leading-relaxed text-slate-700">{latestAssistantMessage?.content || activeMode?.prompt || 'The facilitator is preparing a welcome message for the room.'}</p>
-            {(activeMode || techniqueModeContext) && <p className="mt-2 text-xs leading-relaxed text-slate-500">{effectiveModeInstruction}</p>}
-          </div>
-        </details>
-        <section className="session-glass-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.5rem]" aria-label={sidebarTab === 'chat' ? 'Conversation' : 'People and video'}>
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2">
-            <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Conversation'}</span>
-            <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount} of ${maxParticipants} seats` : `${recentChatMessages.length} recent`}</span>
-          </div>
-          {sidebarTab === 'people' ? renderPeoplePanel('mobile-primary') : renderChatPanel('mobile-primary')}
-        </section>
-        {isSessionEnded ? (
-          <div className="shrink-0 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-sm font-semibold text-amber-950">This session has ended</p>
-            <p className="mt-1 text-xs text-amber-700">Thank you for your participation.</p>
-          </div>
-        ) : (
-          <div className="shrink-0 border-t border-slate-200 bg-white/95 shadow-[0_-8px_20px_rgba(15,23,42,0.06)]">
-            {renderParticipantComposer(true)}
-          </div>
+      <div className="flex min-h-0 flex-1 flex-col p-2 md:hidden">
+        {sidebarTab === 'activity' ? renderMobileActivityPanel() : (
+          <section className="session-glass-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.5rem]" aria-label={sidebarTab === 'conversation' ? 'Conversation' : 'People and video'}>
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2">
+              <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{sidebarTab === 'people' ? 'People' : 'Conversation'}</span>
+              <span className="text-xs font-medium text-slate-500">{sidebarTab === 'people' ? `${currentParticipantCount} of ${maxParticipants} seats` : `${recentChatMessages.length} recent`}</span>
+            </div>
+            {sidebarTab === 'people' ? renderPeoplePanel('mobile-primary') : renderChatPanel('mobile-primary')}
+          </section>
         )}
       </div>
 
@@ -1619,11 +1661,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setSidebarTab('chat')}
-              className={`session-control-button flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              onClick={() => setSidebarTab('conversation')}
+              className={`session-control-button flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${sidebarTab !== 'people' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
             >
               <MessageSquare className="h-4 w-4" />
-              Chat
+              Conversation
             </button>
           </div>
 
@@ -1631,22 +1673,30 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         </aside>
       </div>
 
-      <div className="relative z-20 grid shrink-0 grid-cols-2 border-t border-slate-200 bg-white/95 p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden">
+      <div className="relative z-20 grid shrink-0 grid-cols-3 gap-1 border-t border-slate-200 bg-white/95 p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden">
         <button
           type="button"
-          onClick={() => setSidebarTab('people')}
-          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-          aria-pressed={sidebarTab === 'people'}
+          onClick={() => setSidebarTab('activity')}
+          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition ${sidebarTab === 'activity' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+          aria-pressed={sidebarTab === 'activity'}
         >
-          <Users className="h-4 w-4" /> People
+          <Sparkles className="h-4 w-4" /> Activity
         </button>
         <button
           type="button"
-          onClick={() => setSidebarTab('chat')}
-          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${sidebarTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-          aria-pressed={sidebarTab === 'chat'}
+          onClick={() => setSidebarTab('conversation')}
+          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition ${sidebarTab === 'conversation' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+          aria-pressed={sidebarTab === 'conversation'}
         >
-          <MessageSquare className="h-4 w-4" /> Chat
+          <MessageSquare className="h-4 w-4" /> Conversation
+        </button>
+        <button
+          type="button"
+          onClick={() => setSidebarTab('people')}
+          className={`session-control-button flex min-h-11 touch-manipulation items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition ${sidebarTab === 'people' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+          aria-pressed={sidebarTab === 'people'}
+        >
+          <Users className="h-4 w-4" /> People
         </button>
       </div>
     </div>

@@ -140,6 +140,7 @@ const WEBRTC_CAMERA_READY_BURST_COUNT = 2;
 const WEBRTC_CAMERA_READY_BURST_INTERVAL_MS = 3_000;
 const WEBRTC_ICE_RENEGOTIATION_DELAY_MS = 750;
 const WEBRTC_ICE_STALL_TIMEOUT_MS = 12_000;
+const WEBRTC_CAMERA_READY_STALE_MS = WEBRTC_ICE_STALL_TIMEOUT_MS;
 const WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS = 45_000;
 const WEBRTC_SIGNAL_CRITICAL_RETRY_COUNT = 3;
 const WEBRTC_SIGNAL_CRITICAL_RETRY_DELAY_MS = 300;
@@ -310,6 +311,7 @@ export function useWebRTCSession({
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const renegotiationTimersRef = useRef<Map<string, number>>(new Map());
   const iceStallTimersRef = useRef<Map<string, number>>(new Map());
+  const cameraReadyTimersRef = useRef<Map<string, number>>(new Map());
   const renegotiatePeerRef = useRef<(peerId: string, options?: PeerNegotiationOptions) => void>(() => undefined);
   const localStreamRef = useRef<MediaStream | null>(localStream);
   const hadLocalStreamRef = useRef(Boolean(localStream));
@@ -806,6 +808,9 @@ export function useWebRTCSession({
       if (isSignalOlderThan(signal, WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS)) return;
       const remoteParticipantId = parseParticipantIdFromPeerId(signal.fromPeerId);
       const streamKey = remoteParticipantId === null ? HOST_VIDEO_STREAM_KEY : String(remoteParticipantId);
+      const staleTimer = cameraReadyTimersRef.current.get(streamKey);
+      if (staleTimer) window.clearTimeout(staleTimer);
+      cameraReadyTimersRef.current.delete(streamKey);
       setRemoteCameraStates((previous) => previous[streamKey] === 'off' ? previous : { ...previous, [streamKey]: 'off' });
       removeRemoteStream(signal.fromPeerId);
       return;
@@ -815,7 +820,18 @@ export function useWebRTCSession({
       if (isSignalOlderThan(signal, WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS)) return;
       const remoteParticipantId = parseParticipantIdFromPeerId(signal.fromPeerId);
       const streamKey = remoteParticipantId === null ? HOST_VIDEO_STREAM_KEY : String(remoteParticipantId);
+      const staleTimer = cameraReadyTimersRef.current.get(streamKey);
+      if (staleTimer) window.clearTimeout(staleTimer);
       setRemoteCameraStates((previous) => previous[streamKey] === 'on' ? previous : { ...previous, [streamKey]: 'on' });
+      const timerId = window.setTimeout(() => {
+        const peer = peersRef.current.get(signal.fromPeerId);
+        const hasLiveVideo = Boolean(peer?.remoteStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
+        if (!hasLiveVideo) {
+          setRemoteCameraStates((previous) => previous[streamKey] === 'on' ? { ...previous, [streamKey]: 'off' } : previous);
+        }
+        cameraReadyTimersRef.current.delete(streamKey);
+      }, WEBRTC_CAMERA_READY_STALE_MS);
+      cameraReadyTimersRef.current.set(streamKey, timerId);
       if (isLocalOffererForPeer(signal.fromPeerId)) {
         schedulePeerRenegotiation(signal.fromPeerId);
       }
@@ -1071,6 +1087,7 @@ export function useWebRTCSession({
     const pendingCandidates = pendingCandidatesRef.current;
     const renegotiationTimers = renegotiationTimersRef.current;
     const iceStallTimers = iceStallTimersRef.current;
+    const cameraReadyTimers = cameraReadyTimersRef.current;
     return () => {
       if (conversationId && localPeerId) {
         remotePeerIdsRef.current.forEach((peerId) => {
@@ -1084,6 +1101,8 @@ export function useWebRTCSession({
       renegotiationTimers.clear();
       iceStallTimers.forEach((timerId) => window.clearTimeout(timerId));
       iceStallTimers.clear();
+      cameraReadyTimers.forEach((timerId) => window.clearTimeout(timerId));
+      cameraReadyTimers.clear();
       setPeerStatuses({});
       setRemoteStreams({});
       setRemoteCameraStates({});

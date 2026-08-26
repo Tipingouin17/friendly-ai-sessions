@@ -1021,15 +1021,22 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     : 'Camera off';
 
   const lastSpokenAssistantMessageRef = React.useRef<string | null>(null);
+  const manualReplayInProgressRef = React.useRef(false);
   const lastAssistantMessage = latestAssistantMessage;
   const replayLatestFacilitatorReply = React.useCallback(() => {
-    if (!lastAssistantMessage) return;
+    const playbackBusy = voiceRuntime.playbackState === 'preparing' || voiceRuntime.playbackState === 'playing';
+    if (!lastAssistantMessage || playbackBusy || manualReplayInProgressRef.current) return;
+    manualReplayInProgressRef.current = true;
     const messageId = String(lastAssistantMessage.id);
     const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
     void voiceRuntime.speak({
       text: spokenText || lastAssistantMessage.content,
       messageId,
       metadata: { source: 'participant_manual_tts_replay' },
+    }).finally(() => {
+      // `speak` resolves after playback starts. State keeps the visual button
+      // disabled while audio continues; this ref covers the pre-render tap gap.
+      manualReplayInProgressRef.current = false;
     });
   }, [lastAssistantMessage, voiceRuntime]);
 
@@ -1192,7 +1199,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 
     return (
       <div
-        className={isMobilePanel ? 'flex max-h-[32dvh] min-h-[150px] flex-col overflow-hidden p-2' : 'flex min-h-0 flex-1 flex-col p-3'}
+        className={isMobilePanel ? 'flex max-h-[42dvh] min-h-[180px] flex-col overflow-hidden p-2' : 'flex min-h-0 flex-1 flex-col p-3'}
         data-camera-toggle={`participant-${panelVariant}-preview`}
       >
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -1211,7 +1218,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     const isMobilePanel = panelVariant === 'mobile';
 
     return (
-      <div className={isMobilePanel ? 'max-h-[32dvh] overflow-y-auto p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
+      <div className={isMobilePanel ? 'max-h-[42dvh] min-h-[180px] overflow-y-auto overscroll-contain p-2' : 'min-h-0 flex-1 overflow-y-auto p-3'}>
         {recentChatMessages.length > 0 ? (
           <div className="space-y-3">
             {recentChatMessages.map((message) => (
@@ -1220,7 +1227,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                   <span className="truncate text-xs font-semibold text-indigo-600">{message.sender === 'assistant' ? facilitatorName : message.sender === 'admin' ? 'Host' : resolveParticipantDisplayName(message.participant, (message as Message & { displayName?: string }).displayName || message.name)}</span>
                   <span className="font-mono text-[10px] text-slate-500">{getMessageTime(message)}</span>
                 </div>
-                <p className="line-clamp-4 text-xs leading-relaxed text-slate-700">{message.content}</p>
+                <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-700">{message.content}</p>
               </div>
             ))}
           </div>
@@ -1234,6 +1241,8 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       </div>
     );
   };
+
+  const isAudioPlaybackBusy = voiceRuntime.playbackState === 'preparing' || voiceRuntime.playbackState === 'playing';
 
   return (
     <div className="session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900">
@@ -1260,7 +1269,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               <div className="min-w-0">
                 <p className="text-sm font-bold">
                   {!ttsAvatarEnabled ? 'Facilitator voice is unavailable'
-                    : !audioUnlocked ? 'Enable facilitator audio'
+                    : !audioUnlocked ? 'Enable ElevenLabs audio'
                     : voiceRuntime.playbackState === 'preparing' ? 'Preparing the facilitator voice…'
                     : voiceRuntime.playbackState === 'playing' ? 'Facilitator is speaking'
                     : voiceRuntime.playbackState === 'blocked' ? 'Audio needs your tap'
@@ -1268,20 +1277,20 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                     : !lastAssistantMessage ? 'Facilitator welcome is preparing'
                     : 'Facilitator audio is ready'}
                 </p>
-                <p className="truncate text-xs opacity-80">
+                <p className="text-xs leading-relaxed opacity-80">
                   {!ttsAvatarEnabled ? 'Voice was disabled in the session configuration.'
-                    : !audioUnlocked ? 'Tap Enable audio once, then every facilitator reply can play on this phone.'
+                    : !audioUnlocked ? 'Tap Enable ElevenLabs audio once, then every facilitator reply can play on this phone.'
                     : voiceRuntime.playbackError ?? (lastAssistantMessage ? 'Use Play latest reply to hear the most recent facilitator message.' : 'Audio is prepared; the welcome will play when it is available.')}
                 </p>
               </div>
             </div>
             {!audioUnlocked && ttsAvatarEnabled ? (
-              <button type="button" onClick={handleEnableFacilitatorAudio} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95">
-                <Volume2 className="h-4 w-4" /> Enable audio
+              <button type="button" onClick={handleEnableFacilitatorAudio} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95">
+                <Volume2 className="h-4 w-4" /> Enable ElevenLabs audio
               </button>
             ) : lastAssistantMessage && ttsAvatarEnabled ? (
-              <button type="button" onClick={replayLatestFacilitatorReply} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-current/20 bg-white/80 px-3 py-2 text-xs font-bold shadow-sm transition hover:bg-white active:scale-95">
-                <Play className="h-4 w-4 fill-current" /> Play latest reply
+              <button type="button" onClick={replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-current/20 bg-white/80 px-3 py-2 text-xs font-bold shadow-sm transition hover:bg-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                {voiceRuntime.playbackState === 'preparing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />} {voiceRuntime.playbackState === 'preparing' ? 'Preparing…' : voiceRuntime.playbackState === 'playing' ? 'Playing…' : 'Play latest reply'}
               </button>
             ) : null}
           </div>

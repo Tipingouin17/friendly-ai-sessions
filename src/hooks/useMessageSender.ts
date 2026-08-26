@@ -377,17 +377,28 @@ export const useMessageSender = ({
       }, 4500);
       
     } catch (error: unknown) {
+      // The draft is restored before surfacing an error so a temporary database
+      // contention response can always be retried without retyping.
       sessionState.setInputMessage(sentMessage);
+      const structuredError = error as { code?: string; status?: number } | null;
+      const retryableBusy = structuredError?.code === 'message_service_busy'
+        || structuredError?.code === 'request_timeout'
+        || structuredError?.status === 503;
+      const retryMessage = retryableBusy
+        ? 'Message delivery is temporarily busy. Your text is still in the box; wait a few seconds, then tap Send once.'
+        : 'Message delivery failed. Your text is still in the box; please check your connection and tap Send again.';
       logParticipantDiagnostic('participant_message_send_failed', {
         stage: 'save_or_update_message',
         message_length: sentMessage.length,
         error_message: getDiagnosticErrorMessage(error),
+        retryable_busy: retryableBusy,
+        error_code: structuredError?.code ?? null,
       });
       console.error("Error sending message:", error);
-      setError("Failed to send message. Please try again.");
+      setError(retryMessage);
       toast({
-        title: "Error sending message",
-        description: "Failed to send message. Please try again.",
+        title: retryableBusy ? "Message service is busy" : "Message was not sent",
+        description: retryMessage,
         variant: "destructive",
       });
     } finally {

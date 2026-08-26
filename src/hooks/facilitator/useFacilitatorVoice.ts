@@ -330,6 +330,9 @@ export function useFacilitatorVoice({
   const audioElementRef = React.useRef<HTMLAudioElement | null>(null);
   // Ref to the current server TTS object URL so it can be revoked on cleanup
   const audioObjectUrlRef = React.useRef<string | null>(null);
+  // Each cancellation or new replay invalidates older async synthesis work, so
+  // a delayed response cannot begin playing after a later mobile tap.
+  const playbackGenerationRef = React.useRef(0);
 
   const isSupported = Boolean(getSpeechSynthesis()) && typeof SpeechSynthesisUtterance !== 'undefined';
 
@@ -346,6 +349,7 @@ export function useFacilitatorVoice({
   }, []);
 
   const cancel = React.useCallback(() => {
+    playbackGenerationRef.current += 1;
     // Cancel browser TTS
     const synth = getSpeechSynthesis();
     synth?.cancel();
@@ -409,8 +413,11 @@ export function useFacilitatorVoice({
     const serializedMessageId = messageId != null ? String(messageId) : null;
     if (!enabled || !trimmed || !conversationId || !effectiveEndpoint) return;
 
-    // Cancel any in-progress playback
+    // Cancel any in-progress playback and bind this request to its own
+    // generation. Later taps invalidate this work before it can play.
     cancel();
+    const generation = playbackGenerationRef.current;
+    const isCurrentGeneration = () => playbackGenerationRef.current === generation;
     setAvatarState('thinking');
     setPlaybackState('preparing');
     setPlaybackError(null);
@@ -443,6 +450,10 @@ export function useFacilitatorVoice({
           metadata: personaMetadata,
         })
       : null;
+    if (!isCurrentGeneration()) {
+      void updateTtsEventStatus(queuedEvent?.id, 'cancelled');
+      return;
+    }
     activeEventIdRef.current = queuedEvent?.id;
 
     let serverResult: ServerTtsResult | null = null;
@@ -457,17 +468,23 @@ export function useFacilitatorVoice({
         metadata: personaMetadata,
       });
     } catch (fetchError) {
-      // Server TTS failed — record fallback reason and fall through to browser TTS
-      const fallbackReason = fetchError instanceof Error ? fetchError.message : 'server_tts_fetch_failed';
+      if (!isCurrentGeneration()) return;
+      const serverError = fetchError instanceof Error ? fetchError.message : 'server_tts_fetch_failed';
+      setIsSpeaking(false);
+      setAvatarState('error');
+      setPlaybackState('failed');
+      setPlaybackError('ElevenLabs voice is temporarily unavailable. Tap Play latest reply to retry.');
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
-        metadata: { ...personaMetadata, fallbackReason, fallbackTo: 'browser_speech_synthesis' },
+        metadata: { ...personaMetadata, error: serverError, fallbackDisabled: true },
       });
       activeEventIdRef.current = undefined;
-      // Silent fallback: do not toast; just use browser TTS
-      await speakViaBrowser({ text, messageId, metadata: { ...metadata, fallbackReason, fallbackFrom: 'server' } });
       return;
     }
 
+    if (!isCurrentGeneration()) {
+      URL.revokeObjectURL(serverResult.audioUrl);
+      return;
+    }
     // Store object URL for cleanup
     audioObjectUrlRef.current = serverResult.audioUrl;
 
@@ -485,6 +502,7 @@ export function useFacilitatorVoice({
     });
 
     audio.onplay = () => {
+      if (!isCurrentGeneration()) return;
       setIsSpeaking(true);
       setAvatarState('speaking');
       setPlaybackState('playing');
@@ -492,6 +510,7 @@ export function useFacilitatorVoice({
     };
 
     audio.onended = () => {
+      if (!isCurrentGeneration()) return;
       const durationMs = Math.round(performance.now() - startedAtRef.current);
       setIsSpeaking(false);
       setAvatarState('idle');
@@ -513,10 +532,11 @@ export function useFacilitatorVoice({
     };
 
     audio.onerror = () => {
+      if (!isCurrentGeneration()) return;
       setIsSpeaking(false);
       setAvatarState('error');
       setPlaybackState('failed');
-      setPlaybackError('The facilitator voice could not be played on this device.');
+      setPlaybackError('The ElevenLabs voice could not be played on this device.');
       audioElementRef.current = null;
       _revokeAudioUrl();
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
@@ -525,16 +545,22 @@ export function useFacilitatorVoice({
       activeEventIdRef.current = undefined;
     };
 
+    if (!isCurrentGeneration()) {
+      audio.pause();
+      URL.revokeObjectURL(serverResult.audioUrl);
+      return;
+    }
     try {
       await audio.play();
     } catch (playError) {
+      if (!isCurrentGeneration()) return;
       setIsSpeaking(false);
       setAvatarState('error');
       const isAutoplayBlocked = playError instanceof DOMException && playError.name === 'NotAllowedError';
       setPlaybackState(isAutoplayBlocked ? 'blocked' : 'failed');
       setPlaybackError(isAutoplayBlocked
-        ? 'Tap Enable audio, then use Play latest reply.'
-        : 'The facilitator voice could not be played on this device.');
+        ? 'Tap Enable ElevenLabs audio, then use Play latest reply.'
+        : 'The ElevenLabs voice could not be played on this device.');
       audioElementRef.current = null;
       _revokeAudioUrl();
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
@@ -546,7 +572,6 @@ export function useFacilitatorVoice({
       });
       activeEventIdRef.current = undefined;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animationPreset, cancel, conversationId, defaultVoiceId, effectiveEndpoint, effectiveProvider, enabled, facilitatorId, locale, persistEvents, speakingBehavior, voiceGender, voicePreset, voiceStyle, _revokeAudioUrl]);
 
   // ── Browser TTS speak path ────────────────────────────────────────────────

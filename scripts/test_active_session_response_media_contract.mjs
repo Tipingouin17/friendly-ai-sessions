@@ -15,6 +15,8 @@ const chatInput = read('src/components/chat/ChatInput.tsx');
 const inputFooter = read('src/components/session/InputFooter.tsx');
 const participantView = read('src/components/session/messaging/ParticipantMessagingView.tsx');
 const messageSender = read('src/hooks/useMessageSender.ts');
+const messageSaver = read('src/hooks/messageSender/useMessageSaver.ts');
+const facilitatorVoice = read('src/hooks/facilitator/useFacilitatorVoice.ts');
 const messagingArea = read('src/components/session/MessagingArea.tsx');
 const sessionContainer = read('src/components/session/SessionContainer.tsx');
 const sessionTypes = read('src/types/session.ts');
@@ -43,6 +45,9 @@ assertContains(messageSender, 'saveUserMessage({', 'shared sender retains persis
 assertContains(messagingArea, 'onSendMessage?: (messageOverride?: string) => Promise<void>;', 'messaging area preserves explicit sender contract');
 assertContains(sessionContainer, 'handleSendMessage: (messageOverride?: string) => Promise<void>;', 'session container preserves explicit sender contract');
 assertContains(sessionTypes, 'handleSendMessage: (messageOverride?: string) => Promise<void>;', 'public session type preserves explicit sender contract');
+assertContains(messageSaver, 'saveError.code = error.code;', 'message saver preserves structured backend error codes');
+assertContains(messageSender, "structuredError?.code === 'message_service_busy'", 'participant sender identifies retryable message-pool pressure');
+assertContains(messageSender, 'Your text is still in the box; wait a few seconds, then tap Send once.', 'participant sender preserves and explains retryable drafts');
 
 // The first room message is availability-critical: it is persisted before any
 // provider completion and can therefore never remain indefinitely in preparation.
@@ -103,6 +108,32 @@ assertContains(fastApiServer, 'responses=%d/%d attendees (stored_capacity=%d)', 
 assertContains(fastApiServer, '_schedule_post_insert_session_work(table, results)', 'batch inserts invoke shared post-insert scheduling after broadcast routing');
 assertContains(fastApiServer, '_schedule_post_insert_session_work(table, [result])', 'single-row inserts invoke shared post-insert scheduling after broadcast routing');
 assertNotContains(fastApiServer, 'if table == "messages" and conv_id and result.get("role") == "user":', 'continuation scheduling is not trapped inside the mode-session broadcast branch');
+
+// Tokenized REST requests must never acquire a second connection while already
+// holding their request-scoped pool connection; that self-starved Android reads.
+assertContains(fastApiServer, 'async def _acquire_interactive_message_connection', 'participant messages have a bounded interactive acquisition path');
+assertContains(fastApiServer, 'busy_code="message_service_busy"', 'participant message pressure returns a structured retryable code');
+assertContains(fastApiServer, '_acquire_interactive_message_connection("participant message write")', 'tokenized participant REST messages use bounded acquisition');
+assertContains(fastApiServer, 'conn: asyncpg.Connection | None = None', 'join-token validation accepts a request-scoped connection');
+assertContains(fastApiServer, 'if not await _validate_join_token(join_token_header, conversation_id, conn):', 'participant message authorization reuses the request connection');
+assertNotContains(fastApiServer, 'IMPORTANT: Always acquires its own connection from the pool', 'join-token validator no longer documents unsafe nested acquisition');
+assertContains(fastApiServer, 'The budget applies only while waiting for a pool slot.', 'interactive reads and messages bound acquisition without cancelling owned work');
+assertContains(fastApiServer, '_pool_pressure_snapshot()', 'pool-pressure diagnostics are retained for future operational triage');
+
+// Server-configured participant voice is explicitly ElevenLabs-only: never a
+// hidden browser speech fallback, and stale synthesis work cannot replay.
+assertContains(facilitatorVoice, 'const playbackGenerationRef = React.useRef(0);', 'server voice tracks a playback generation');
+assertContains(facilitatorVoice, 'playbackGenerationRef.current += 1;', 'cancellation invalidates stale server audio work');
+assertContains(facilitatorVoice, 'if (!isCurrentGeneration()) {', 'server TTS ignores stale async synthesis results');
+assertContains(facilitatorVoice, 'fallbackDisabled: true', 'server TTS failure records that browser fallback is disabled');
+assertNotContains(facilitatorVoice, "fallbackTo: 'browser_speech_synthesis'", 'server-configured TTS never silently falls back to browser speech');
+assertContains(facilitatorVoice, 'ElevenLabs voice is temporarily unavailable.', 'server TTS failures are visible and retryable');
+assertContains(participantView, 'Enable ElevenLabs audio', 'mobile participant sees the configured provider in the permission action');
+assertContains(participantView, 'manualReplayInProgressRef', 'mobile replay has a synchronous pre-render tap guard');
+assertContains(participantView, 'disabled={isAudioPlaybackBusy}', 'mobile replay is disabled while preparing or playing');
+assertNotContains(participantView, 'line-clamp-4 text-xs leading-relaxed text-slate-700', 'mobile chat never truncates a facilitator message after four lines');
+assertContains(participantView, 'whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-700', 'mobile chat preserves full wrapped text');
+assertContains(participantView, 'max-h-[42dvh] min-h-[180px] overflow-y-auto overscroll-contain', 'mobile chat has a readable constrained scroll surface');
 
 // A full room may become ready, but only the host may call the atomic start endpoint.
 assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start hook cannot call the host start operation');

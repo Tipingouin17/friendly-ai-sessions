@@ -1082,55 +1082,95 @@ async def _bounded_lifecycle_transaction(
         ) from exc
 
 
-@asynccontextmanager
-async def _acquire_join_connection(operation: str):
-    """Acquire a database connection for the mobile invitation critical path.
+def _pool_pressure_snapshot() -> str:
+    """Return non-sensitive pool telemetry for saturation diagnostics."""
+    if _pool is None:
+        return "pool=unavailable"
+    try:
+        return f"size={_pool.get_size()} idle={_pool.get_idle_size()} max={_pool.get_max_size()}"
+    except Exception:
+        return "pool=metrics-unavailable"
 
-    The tokenized conversation read is the first request made after scanning an
-    invite.  It must fail clearly within a short budget when the shared pool is
-    busy; otherwise Android is left on a skeleton until its browser aborts.
+
+@asynccontextmanager
+async def _acquire_pool_connection(
+    operation: str,
+    *,
+    timeout_seconds: int,
+    unavailable_code: str,
+    busy_code: str,
+    unavailable_message: str,
+    busy_message: str,
+    logger: logging.Logger,
+):
+    """Acquire one connection within a bounded interactive budget.
+
+    The budget applies only while waiting for a pool slot.  A caller that owns a
+    connection keeps its existing database statement/transaction limits, rather
+    than having its in-flight request cancelled by an acquisition timeout.
     """
     if _pool is None:
-        raise HTTPException(
-            503,
-            detail={"code": "join_service_unavailable", "message": "The session is temporarily unavailable. Please try again shortly."},
-        )
+        raise HTTPException(503, detail={"code": unavailable_code, "message": unavailable_message})
     try:
-        async with asyncio.timeout(6):
-            async with _pool.acquire() as conn:
-                yield conn
+        async with asyncio.timeout(timeout_seconds):
+            conn = await _pool.acquire()
     except TimeoutError as exc:
-        log_session.warning("participant invitation database operation timed out: %s", operation)
-        raise HTTPException(
-            503,
-            detail={"code": "join_service_busy", "message": "The session is busy preparing. Please wait a few seconds and try again."},
-        ) from exc
+        logger.warning(
+            "database acquisition timed out: operation=%s timeout_seconds=%s %s",
+            operation,
+            timeout_seconds,
+            _pool_pressure_snapshot(),
+        )
+        raise HTTPException(503, detail={"code": busy_code, "message": busy_message}) from exc
+    try:
+        yield conn
+    finally:
+        await _pool.release(conn)
+
+
+@asynccontextmanager
+async def _acquire_join_connection(operation: str):
+    """Acquire a connection for the mobile invitation critical path."""
+    async with _acquire_pool_connection(
+        operation,
+        timeout_seconds=6,
+        unavailable_code="join_service_unavailable",
+        busy_code="join_service_busy",
+        unavailable_message="The session is temporarily unavailable. Please try again shortly.",
+        busy_message="The session is busy preparing. Please wait a few seconds and try again.",
+        logger=log_session,
+    ) as conn:
+        yield conn
 
 
 @asynccontextmanager
 async def _acquire_interactive_read_connection(operation: str):
-    """Acquire a shared database connection for an interactive browser read.
+    """Acquire a shared connection for an interactive browser read."""
+    async with _acquire_pool_connection(
+        operation,
+        timeout_seconds=6,
+        unavailable_code="read_service_unavailable",
+        busy_code="read_service_busy",
+        unavailable_message="The service is temporarily unavailable. Please try again shortly.",
+        busy_message="The service is temporarily busy. Please wait a few seconds and try again.",
+        logger=log_db,
+    ) as conn:
+        yield conn
 
-    Host navigation (facilitators, workshops, profile metadata) must receive a
-    bounded retryable response during temporary pool pressure. Leaving generic
-    reads unbounded strands the UI on skeletons even though the process health
-    endpoint remains available.
-    """
-    if _pool is None:
-        raise HTTPException(
-            503,
-            detail={"code": "read_service_unavailable", "message": "The service is temporarily unavailable. Please try again shortly."},
-        )
-    try:
-        async with asyncio.timeout(6):
-            async with _pool.acquire() as conn:
-                yield conn
-    except TimeoutError as exc:
-        log_db.warning("interactive database read timed out: %s", operation)
-        raise HTTPException(
-            503,
-            detail={"code": "read_service_busy", "message": "The service is temporarily busy. Please wait a few seconds and try again."},
-        ) from exc
+
+@asynccontextmanager
+async def _acquire_interactive_message_connection(operation: str):
+    """Reserve a bounded acquisition path for a participant's durable chat write."""
+    async with _acquire_pool_connection(
+        operation,
+        timeout_seconds=8,
+        unavailable_code="message_service_unavailable",
+        busy_code="message_service_busy",
+        unavailable_message="Message delivery is temporarily unavailable. Please keep your text and try again shortly.",
+        busy_message="Message delivery is temporarily busy. Your text is still here; please try again in a few seconds.",
+        logger=log_db,
+    ) as conn:
+        yield conn
 
 
 def _build_dsn() -> str:
@@ -1155,7 +1195,13 @@ async def _create_pool() -> asyncpg.Pool:
       TCP connections between the pool and PostgreSQL (TCP_TOO_OLD_ACK).
     """
     dsn = _build_dsn()
-    log_db.info("Creating asyncpg pool (min=2, max=10) ...")
+    try:
+        max_pool_size = int(os.getenv("DB_POOL_MAX_SIZE", "10"))
+    except ValueError:
+        max_pool_size = 10
+        log_db.warning("Invalid DB_POOL_MAX_SIZE; using the safe default of 10")
+    max_pool_size = max(2, min(max_pool_size, 50))
+    log_db.info("Creating asyncpg pool (min=2, max=%s) ...", max_pool_size)
 
     async def _init_connection(conn):
         """Register JSON/JSONB codecs so asyncpg returns dicts instead of strings."""
@@ -1177,7 +1223,7 @@ async def _create_pool() -> asyncpg.Pool:
     pool = await asyncpg.create_pool(
         dsn,
         min_size=2,
-        max_size=10,
+        max_size=max_pool_size,
         command_timeout=15,
         server_settings={
             "statement_timeout": "10000",  # 10 seconds in ms
@@ -4315,28 +4361,39 @@ MODE_EVENT_TYPES = {
 }
 
 
-async def _validate_join_token(token: str, conversation_id: str | int | None, conn=None) -> bool:
-    """Return True if `token` is the correct join_token for `conversation_id` (asyncpg).
-    
-    IMPORTANT: Always acquires its own connection from the pool to avoid deadlocks.
-    The `conn` parameter is ignored and kept only for backwards compatibility.
+async def _validate_join_token(
+    token: str,
+    conversation_id: str | int | None,
+    conn: asyncpg.Connection | None = None,
+) -> bool:
+    """Return whether a token authorizes the supplied conversation.
+
+    A request that already owns a pool connection must reuse it.  Acquiring a
+    second connection from inside every tokenized REST request can self-starve a
+    finite pool when several host/participant reads arrive concurrently.
     """
     if not token or not conversation_id:
         return False
-    # asyncpg requires an integer for the id column — cast from string if needed
     try:
         conv_id_int = int(conversation_id)
     except (ValueError, TypeError):
         return False
     try:
-        # Always use a fresh connection to avoid deadlocks when called
-        # from within an existing async with _pool.acquire() block
-        async with _pool.acquire() as fresh_conn:
-            row = await fresh_conn.fetchrow(
+        if conn is not None:
+            row = await conn.fetchrow(
                 'SELECT 1 FROM public."conversations" '
                 'WHERE id = $1 AND join_token = $2::uuid',
-                conv_id_int, token,
+                conv_id_int,
+                token,
             )
+        else:
+            async with _pool.acquire() as acquired_conn:
+                row = await acquired_conn.fetchrow(
+                    'SELECT 1 FROM public."conversations" '
+                    'WHERE id = $1 AND join_token = $2::uuid',
+                    conv_id_int,
+                    token,
+                )
         return row is not None
     except Exception:
         return False
@@ -6872,6 +6929,8 @@ async def rest_table(table: str, request: Request):
             if request.method in ("GET", "HEAD") and table == "conversations" and join_token_header
             else _acquire_interactive_read_connection(f"REST {table} read")
             if request.method in ("GET", "HEAD")
+            else _acquire_interactive_message_connection("participant message write")
+            if request.method == "POST" and table == "messages" and join_token_header
             else _pool.acquire()
         )
         async with connection_context as conn:
@@ -7071,7 +7130,7 @@ async def rest_table(table: str, request: Request):
                             and str(signal_data.get("signalType")) in {"offer", "answer", "ice-candidate", "camera-ready", "camera-stopped", "reconnect-request"}
                         )
                         if participant_message or participant_webrtc_signal:
-                            if not await _validate_join_token(join_token_header, conversation_id):
+                            if not await _validate_join_token(join_token_header, conversation_id, conn):
                                 raise HTTPException(403, "Invalid session token")
                         else:
                             await _require_conversation_host_access(request, conversation_id)

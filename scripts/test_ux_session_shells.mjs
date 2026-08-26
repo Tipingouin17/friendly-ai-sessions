@@ -111,7 +111,7 @@ assertNotContains(participantView, 'hasTtsEventForMessage', 'participant playbac
 assertContains(participantView, 'facilitator-tts-spoken:${conversationId}:${messageId}', 'participant replay guard remains scoped to the local browser session');
 assertContains(participantView, 'const messageId = String(lastAssistantMessage.id);', 'participant serializes assistant message id before speech tracking');
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
-assertContains(participantView, 'Enable facilitator audio', 'participant exposes an explicit mobile audio-enable state');
+assertContains(participantView, 'Enable ElevenLabs audio', 'participant exposes an explicit provider-specific mobile audio-enable state');
 assertContains(participantView, 'Play latest reply', 'participant exposes a visible replay action for facilitator audio');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');

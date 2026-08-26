@@ -72,7 +72,10 @@ export const useMessageSaver = () => {
 
     if (error) {
       console.error("Error saving message to database:", error);
-      throw new Error(error.message);
+      const saveError = new Error(error.message) as Error & { code?: string; status?: number };
+      saveError.code = error.code;
+      saveError.status = error.status;
+      throw saveError;
     }
 
     // Reuse the persisted identity so the optimistic message and the later

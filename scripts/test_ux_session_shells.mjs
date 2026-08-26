@@ -32,6 +32,8 @@ const appRoutes = read('src/App.tsx');
 const forgotPasswordPage = read('src/pages/ForgotPassword.tsx');
 const resetPasswordPage = read('src/pages/ResetPassword.tsx');
 const cookieBanner = read('src/components/CookieBanner.tsx');
+const errorBoundary = read('src/components/ErrorBoundary.tsx');
+const staleAssetRecovery = read('src/utils/staleAssetRecovery.ts');
 
 const assertContains = (source, needle, label) => {
   assert.ok(source.includes(needle), `${label} should include ${needle}`);
@@ -52,6 +54,16 @@ assertContains(cookieBanner, 'Reject optional cookies', 'cookie consent exposes 
 assertContains(cookieBanner, 'Manage privacy choices', 'cookie consent preserves granular preferences');
 assertContains(cookieBanner, 'dialogRef.current?.focus()', 'cookie consent receives keyboard focus when opened');
 assertNotContains(cookieBanner, 'aria-label="Reject optional cookies and close"', 'cookie consent has no ambiguous close action that silently rejects optional cookies');
+
+// A mobile browser can retain a previous Vite route while a deployment changes hashed chunks.
+assertContains(staleAssetRecovery, 'STALE_ASSET_RECOVERY_EVENT = \'vite:preloadError\'', 'shared stale-asset recovery subscribes to Vite preload failures');
+assertContains(staleAssetRecovery, 'importing a module script failed', 'stale-asset recovery recognizes Android module-script failures');
+assertContains(staleAssetRecovery, 'failed to load module script', 'stale-asset recovery recognizes Vite module-load failures');
+assertContains(staleAssetRecovery, 'unable to preload css', 'stale-asset recovery recognizes Vite preload failures');
+assertContains(staleAssetRecovery, "target.searchParams.set(RECOVERY_QUERY_KEY", 'stale-asset recovery preserves the participant route while forcing one fresh document request');
+assertContains(staleAssetRecovery, 'sessionStorage.getItem(RECOVERY_MARKER_KEY)', 'stale-asset recovery prevents an Android reload loop');
+assertContains(errorBoundary, 'recoverFromStaleAssetError(error)', 'global error boundary delegates stale chunks to shared recovery');
+assertContains(appRoutes, 'window.addEventListener(STALE_ASSET_RECOVERY_EVENT', 'application bootstrap catches Vite preload errors before a generic error boundary');
 assertContains(participantView, 'session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900', 'participant redesigned light shell surface');
 assertContains(participantView, 'Facilitator tile is shown with everyone else', 'participant renders the AI facilitator as a normal room tile instead of an oversized spotlight');
 assertContains(participantView, 'Current question', 'participant current-question card');

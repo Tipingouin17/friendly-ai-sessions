@@ -12,6 +12,7 @@ import { ActivationRouteGuard } from "./components/ActivationRouteGuard";
 import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 import { ProtectedAdminRoute } from "./components/ProtectedAdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { recoverFromStaleAssetError, STALE_ASSET_RECOVERY_EVENT } from "./utils/staleAssetRecovery";
 
 // Eagerly loaded — always needed on first paint
 import Index from "./pages/Index";
@@ -159,6 +160,15 @@ function RouteTracking() {
 
 function App() {
   const [forceCookieSettingsOpen, setForceCookieSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleVitePreloadError = (event: Event) => {
+      const preloadError = event as Event & { payload?: unknown };
+      if (recoverFromStaleAssetError(preloadError.payload)) event.preventDefault();
+    };
+    window.addEventListener(STALE_ASSET_RECOVERY_EVENT, handleVitePreloadError as EventListener);
+    return () => window.removeEventListener(STALE_ASSET_RECOVERY_EVENT, handleVitePreloadError as EventListener);
+  }, []);
 
   useEffect(() => {
     const handleOpenCookieSettings = () => setForceCookieSettingsOpen(true);

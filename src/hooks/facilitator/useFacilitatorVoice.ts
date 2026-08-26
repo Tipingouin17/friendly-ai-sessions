@@ -241,7 +241,8 @@ const deriveBrowserSpeechSettings = (speakingBehavior?: Record<string, unknown> 
 // ── Server TTS helpers ────────────────────────────────────────────────────────
 
 interface ServerTtsResult {
-  audioUrl: string;
+  /** Raw provider bytes are retained for Web Audio decoding or HTMLMedia fallback. */
+  audioData: ArrayBuffer;
   provider: string;
   voiceId: string;
   preset: string;
@@ -249,8 +250,9 @@ interface ServerTtsResult {
 }
 
 /**
- * Fetch audio from the server TTS endpoint and return an object URL.
- * Throws on network error or non-2xx response so callers can fall back.
+ * Fetch server-resolved ElevenLabs bytes. Callers may decode them with Web Audio
+ * or use the identical byte stream with HTMLMedia; neither path may fall back to
+ * browser SpeechSynthesis when the configured provider is server.
  */
 async function fetchServerTts(params: {
   text: string;
@@ -292,14 +294,14 @@ async function fetchServerTts(params: {
     throw new Error(`Server TTS returned ${response.status}`);
   }
 
-  const blob = await response.blob();
-  const audioUrl = URL.createObjectURL(blob);
+  const audioData = await response.arrayBuffer();
+  if (audioData.byteLength === 0) throw new Error('Server TTS returned an empty audio response');
   const provider = response.headers.get('X-TTS-Provider') ?? 'server';
   const voiceId = response.headers.get('X-TTS-Voice-Id') ?? '';
   const preset = response.headers.get('X-TTS-Preset') ?? 'default';
   const chars = Number(response.headers.get('X-TTS-Chars') ?? params.text.length);
 
-  return { audioUrl, provider, voiceId, preset, chars };
+  return { audioData, provider, voiceId, preset, chars };
 }
 
 export function useFacilitatorVoice({
@@ -330,6 +332,10 @@ export function useFacilitatorVoice({
   const audioElementRef = React.useRef<HTMLAudioElement | null>(null);
   // Ref to the current server TTS object URL so it can be revoked on cleanup
   const audioObjectUrlRef = React.useRef<string | null>(null);
+  // Android Chrome can reject delayed HTMLMedia playback despite a muted primer.
+  // Keep one gesture-resumed context and use it for decoded ElevenLabs bytes.
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const audioBufferSourceRef = React.useRef<AudioBufferSourceNode | null>(null);
   // Each cancellation or new replay invalidates older async synthesis work, so
   // a delayed response cannot begin playing after a later mobile tap.
   const playbackGenerationRef = React.useRef(0);
@@ -350,6 +356,12 @@ export function useFacilitatorVoice({
 
   const cancel = React.useCallback(() => {
     playbackGenerationRef.current += 1;
+    if (audioBufferSourceRef.current) {
+      audioBufferSourceRef.current.onended = null;
+      try { audioBufferSourceRef.current.stop(); } catch { /* source already stopped */ }
+      try { audioBufferSourceRef.current.disconnect(); } catch { /* source already disconnected */ }
+      audioBufferSourceRef.current = null;
+    }
     // Cancel browser TTS
     const synth = getSpeechSynthesis();
     synth?.cancel();
@@ -371,41 +383,54 @@ export function useFacilitatorVoice({
     activeEventIdRef.current = undefined;
   }, [_revokeAudioUrl]);
 
-  React.useEffect(() => cancel, [cancel]);
+  React.useEffect(() => () => {
+    cancel();
+    const context = audioContextRef.current;
+    audioContextRef.current = null;
+    if (context && context.state !== 'closed') void context.close();
+  }, [cancel]);
 
   React.useEffect(() => {
     if (!enabled) cancel();
   }, [cancel, enabled]);
 
-  const unlockAudio = React.useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined') return false;
-    let unlocked = false;
+  const getUnlockedAudioContext = React.useCallback(async (): Promise<AudioContext | null> => {
+    if (typeof window === 'undefined') return null;
     try {
       const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const context = new AudioCtx();
-        await context.resume();
-        unlocked = context.state === 'running';
-        void context.close();
+      if (!AudioCtx) return null;
+      let context = audioContextRef.current;
+      if (!context || context.state === 'closed') {
+        context = new AudioCtx();
+        audioContextRef.current = context;
       }
+      if (context.state !== 'running') await context.resume();
+      return context.state === 'running' ? context : null;
     } catch {
-      // HTMLMedia playback below is the more important mobile unlock path.
+      return null;
     }
-    try {
-      // iOS Safari associates this silent HTMLMediaElement playback with the
-      // current tap, allowing later ElevenLabs audio to begin programmatically.
-      const primer = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
-      primer.muted = true;
-      await primer.play();
-      primer.pause();
-      primer.removeAttribute('src');
-      primer.load();
-      unlocked = true;
-    } catch {
-      // The caller still receives a visible retry path if the browser refuses.
-    }
-    return unlocked;
   }, []);
+
+  const unlockAudio = React.useCallback(async (): Promise<boolean> => {
+    const context = await getUnlockedAudioContext();
+    if (context) {
+      // Start a silent buffer inside the real user gesture. Unlike the former
+      // disposable context, this is the exact pipeline used for later ElevenLabs
+      // byte-stream playback on Android.
+      try {
+        const primer = context.createBufferSource();
+        primer.buffer = context.createBuffer(1, 1, context.sampleRate);
+        primer.connect(context.destination);
+        primer.start();
+        primer.stop();
+        return true;
+      } catch {
+        // The retained running context is still a valid unlock result.
+        return context.state === 'running';
+      }
+    }
+    return false;
+  }, [getUnlockedAudioContext]);
 
   // ── Server TTS speak path ─────────────────────────────────────────────────
   const speakViaServer = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
@@ -456,7 +481,7 @@ export function useFacilitatorVoice({
     }
     activeEventIdRef.current = queuedEvent?.id;
 
-    let serverResult: ServerTtsResult | null = null;
+    let serverResult: ServerTtsResult;
     try {
       serverResult = await fetchServerTts({
         text: trimmed,
@@ -481,98 +506,125 @@ export function useFacilitatorVoice({
       return;
     }
 
-    if (!isCurrentGeneration()) {
-      URL.revokeObjectURL(serverResult.audioUrl);
-      return;
+    if (!isCurrentGeneration()) return;
+
+    const basePlaybackMetadata = {
+      ...personaMetadata,
+      characterCount: trimmed.length,
+      provider: serverResult.provider,
+      voiceId: serverResult.voiceId,
+      voicePreset: serverResult.preset,
+    };
+    const completePlayback = (deliveryPath: 'web_audio' | 'html_media') => {
+      if (!isCurrentGeneration()) return;
+      const durationMs = Math.round(performance.now() - startedAtRef.current);
+      setIsSpeaking(false);
+      setAvatarState('idle');
+      setPlaybackState('idle');
+      audioBufferSourceRef.current = null;
+      audioElementRef.current = null;
+      _revokeAudioUrl();
+      void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
+        audio_duration_ms: durationMs,
+        metadata: { ...basePlaybackMetadata, deliveryPath },
+      });
+      activeEventIdRef.current = undefined;
+    };
+    const failPlayback = (
+      deliveryPath: 'web_audio' | 'html_media',
+      error: unknown,
+      mediaErrorCode?: number | null,
+    ) => {
+      if (!isCurrentGeneration()) return;
+      setIsSpeaking(false);
+      setAvatarState('error');
+      setPlaybackState('failed');
+      setPlaybackError('The ElevenLabs voice could not be played on this device.');
+      audioBufferSourceRef.current = null;
+      audioElementRef.current = null;
+      _revokeAudioUrl();
+      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
+        metadata: {
+          ...basePlaybackMetadata,
+          deliveryPath,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : 'audio_playback_failed',
+          mediaErrorCode: mediaErrorCode ?? null,
+        },
+      });
+      activeEventIdRef.current = undefined;
+    };
+
+    // Preferred Android path: decode and play the exact ElevenLabs MP3 through
+    // the AudioContext that was resumed by the visible user gesture.  It avoids
+    // delayed HTMLMedia autoplay heuristics without changing provider or voice.
+    let webAudioError: unknown = null;
+    const context = await getUnlockedAudioContext();
+    if (!isCurrentGeneration()) return;
+    if (context) {
+      try {
+        const decodedAudio = await context.decodeAudioData(serverResult.audioData.slice(0));
+        if (!isCurrentGeneration()) return;
+        const source = context.createBufferSource();
+        source.buffer = decodedAudio;
+        source.connect(context.destination);
+        source.onended = () => completePlayback('web_audio');
+        audioBufferSourceRef.current = source;
+        source.start(0);
+        setIsSpeaking(true);
+        setAvatarState('speaking');
+        setPlaybackState('playing');
+        setPlaybackError(null);
+        void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
+          metadata: { ...basePlaybackMetadata, deliveryPath: 'web_audio' },
+        });
+        return;
+      } catch (error) {
+        webAudioError = error;
+      }
+    } else {
+      webAudioError = new Error('No user-gesture-resumed AudioContext was available');
     }
-    // Store object URL for cleanup
-    audioObjectUrlRef.current = serverResult.audioUrl;
 
-    const audio = new Audio(serverResult.audioUrl);
+    // Compatibility fallback: preserve the same ElevenLabs bytes and never use
+    // browser SpeechSynthesis for a server-configured facilitator voice.
+    if (!isCurrentGeneration()) return;
+    const fallbackBlob = new Blob([serverResult.audioData], { type: 'audio/mpeg' });
+    const fallbackUrl = URL.createObjectURL(fallbackBlob);
+    audioObjectUrlRef.current = fallbackUrl;
+    const audio = new Audio(fallbackUrl);
     audioElementRef.current = audio;
-
-    void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
-      metadata: {
-        ...personaMetadata,
-        characterCount: trimmed.length,
-        provider: serverResult.provider,
-        voiceId: serverResult.voiceId,
-        voicePreset: serverResult.preset,
-      },
-    });
-
     audio.onplay = () => {
       if (!isCurrentGeneration()) return;
       setIsSpeaking(true);
       setAvatarState('speaking');
       setPlaybackState('playing');
       setPlaybackError(null);
-    };
-
-    audio.onended = () => {
-      if (!isCurrentGeneration()) return;
-      const durationMs = Math.round(performance.now() - startedAtRef.current);
-      setIsSpeaking(false);
-      setAvatarState('idle');
-      setPlaybackState('idle');
-      audioElementRef.current = null;
-      _revokeAudioUrl();
-      void updateTtsEventStatus(activeEventIdRef.current, 'completed', {
-        audio_duration_ms: durationMs,
-        metadata: {
-          ...personaMetadata,
-          characterCount: trimmed.length,
-          provider: serverResult!.provider,
-          voiceId: serverResult!.voiceId,
-          voicePreset: serverResult!.preset,
-          latencyMs: Math.round(performance.now() - startedAtRef.current - durationMs),
-        },
+      void updateTtsEventStatus(activeEventIdRef.current, 'speaking', {
+        metadata: { ...basePlaybackMetadata, deliveryPath: 'html_media_fallback', webAudioError: webAudioError instanceof Error ? webAudioError.message : 'web_audio_unavailable' },
       });
-      activeEventIdRef.current = undefined;
     };
+    audio.onended = () => completePlayback('html_media');
+    audio.onerror = () => failPlayback('html_media', webAudioError, audio.error?.code ?? null);
 
-    audio.onerror = () => {
-      if (!isCurrentGeneration()) return;
-      setIsSpeaking(false);
-      setAvatarState('error');
-      setPlaybackState('failed');
-      setPlaybackError('The ElevenLabs voice could not be played on this device.');
-      audioElementRef.current = null;
-      _revokeAudioUrl();
-      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
-        metadata: { ...personaMetadata, characterCount: trimmed.length, audioPlaybackError: true },
-      });
-      activeEventIdRef.current = undefined;
-    };
-
-    if (!isCurrentGeneration()) {
-      audio.pause();
-      URL.revokeObjectURL(serverResult.audioUrl);
-      return;
-    }
     try {
       await audio.play();
     } catch (playError) {
       if (!isCurrentGeneration()) return;
-      setIsSpeaking(false);
-      setAvatarState('error');
       const isAutoplayBlocked = playError instanceof DOMException && playError.name === 'NotAllowedError';
-      setPlaybackState(isAutoplayBlocked ? 'blocked' : 'failed');
-      setPlaybackError(isAutoplayBlocked
-        ? 'Tap Enable ElevenLabs audio, then use Play latest reply.'
-        : 'The ElevenLabs voice could not be played on this device.');
-      audioElementRef.current = null;
-      _revokeAudioUrl();
-      void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
-        metadata: {
-          ...personaMetadata,
-          characterCount: trimmed.length,
-          error: playError instanceof Error ? playError.message : 'audio_play_failed',
-        },
-      });
-      activeEventIdRef.current = undefined;
+      if (isAutoplayBlocked) {
+        setPlaybackState('blocked');
+        setPlaybackError('Tap Enable ElevenLabs audio, then use Play latest reply.');
+        audioElementRef.current = null;
+        _revokeAudioUrl();
+        void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
+          metadata: { ...basePlaybackMetadata, deliveryPath: 'html_media', error: `${playError.name}: ${playError.message}`, webAudioError: webAudioError instanceof Error ? webAudioError.message : 'web_audio_unavailable' },
+        });
+        activeEventIdRef.current = undefined;
+      } else {
+        failPlayback('html_media', playError);
+      }
     }
-  }, [animationPreset, cancel, conversationId, defaultVoiceId, effectiveEndpoint, effectiveProvider, enabled, facilitatorId, locale, persistEvents, speakingBehavior, voiceGender, voicePreset, voiceStyle, _revokeAudioUrl]);
+  }, [animationPreset, cancel, conversationId, defaultVoiceId, effectiveEndpoint, effectiveProvider, enabled, facilitatorId, getUnlockedAudioContext, locale, persistEvents, speakingBehavior, voiceGender, voicePreset, voiceStyle, _revokeAudioUrl]);
 
   // ── Browser TTS speak path ────────────────────────────────────────────────
   const speakViaBrowser = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {

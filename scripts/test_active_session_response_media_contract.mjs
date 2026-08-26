@@ -128,6 +128,15 @@ assertContains(facilitatorVoice, 'if (!isCurrentGeneration()) {', 'server TTS ig
 assertContains(facilitatorVoice, 'fallbackDisabled: true', 'server TTS failure records that browser fallback is disabled');
 assertNotContains(facilitatorVoice, "fallbackTo: 'browser_speech_synthesis'", 'server-configured TTS never silently falls back to browser speech');
 assertContains(facilitatorVoice, 'ElevenLabs voice is temporarily unavailable.', 'server TTS failures are visible and retryable');
+assertContains(facilitatorVoice, 'const audioContextRef = React.useRef<AudioContext | null>(null);', 'server voice retains a Web Audio context after the enable gesture');
+assertContains(facilitatorVoice, 'const audioBufferSourceRef = React.useRef<AudioBufferSourceNode | null>(null);', 'server voice can cancel a decoded Android audio source');
+assertContains(facilitatorVoice, 'const getUnlockedAudioContext = React.useCallback', 'server voice obtains the retained user-gesture-resumed context');
+assertContains(facilitatorVoice, 'context.decodeAudioData(serverResult.audioData.slice(0))', 'server voice decodes the exact ElevenLabs bytes through Web Audio');
+assertContains(facilitatorVoice, "deliveryPath: 'web_audio'", 'server voice records its preferred Android delivery path');
+assertContains(facilitatorVoice, "new Blob([serverResult.audioData], { type: 'audio/mpeg' })", 'HTMLMedia compatibility fallback uses the same ElevenLabs MP3 bytes');
+assertContains(facilitatorVoice, 'mediaErrorCode: mediaErrorCode ?? null', 'server playback failures retain a non-sensitive concrete media diagnostic');
+assertNotContains(facilitatorVoice, "unlocked = context.state === 'running';\n        void context.close();", 'the audio-enable gesture does not close the context needed for delayed Android playback');
+assertContains(facilitatorVoice, "if (context && context.state !== 'closed') void context.close();", 'the retained context is closed only during hook cleanup');
 assertContains(participantView, 'Enable ElevenLabs audio', 'mobile participant sees the configured provider in the permission action');
 assertContains(participantView, 'manualReplayInProgressRef', 'mobile replay has a synchronous pre-render tap guard');
 assertContains(participantView, 'disabled={isAudioPlaybackBusy}', 'mobile replay is disabled while preparing or playing');

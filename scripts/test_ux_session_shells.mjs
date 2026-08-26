@@ -30,6 +30,7 @@ const protectedHostRoute = read('src/components/ProtectedHostRoute.tsx');
 const appRoutes = read('src/App.tsx');
 const forgotPasswordPage = read('src/pages/ForgotPassword.tsx');
 const resetPasswordPage = read('src/pages/ResetPassword.tsx');
+const cookieBanner = read('src/components/CookieBanner.tsx');
 
 const assertContains = (source, needle, label) => {
   assert.ok(source.includes(needle), `${label} should include ${needle}`);
@@ -40,6 +41,16 @@ const assertNotContains = (source, needle, label) => {
 };
 
 assertContains(participantView, 'AI in room', 'participant room-gallery documentation');
+
+// First-use privacy consent must be an explicit, mobile-safe decision surface.
+assertContains(cookieBanner, 'fixed inset-0 z-[9999] flex items-end justify-center', 'cookie consent uses a visible modal overlay rather than a low-profile footer strip');
+assertContains(cookieBanner, 'max-h-[calc(100dvh-1.5rem)]', 'cookie consent respects the mobile dynamic viewport');
+assertContains(cookieBanner, 'Your privacy choices', 'cookie consent has a clear decision-focused title');
+assertContains(cookieBanner, 'Accept optional cookies', 'cookie consent exposes an explicit optional-cookie acceptance action');
+assertContains(cookieBanner, 'Reject optional cookies', 'cookie consent exposes an equally explicit optional-cookie rejection action');
+assertContains(cookieBanner, 'Manage privacy choices', 'cookie consent preserves granular preferences');
+assertContains(cookieBanner, 'dialogRef.current?.focus()', 'cookie consent receives keyboard focus when opened');
+assertNotContains(cookieBanner, 'aria-label="Reject optional cookies and close"', 'cookie consent has no ambiguous close action that silently rejects optional cookies');
 assertContains(participantView, 'session-redesign-shell flex h-full flex-col overflow-hidden text-slate-900', 'participant redesigned light shell surface');
 assertContains(participantView, 'Facilitator tile is shown with everyone else', 'participant renders the AI facilitator as a normal room tile instead of an oversized spotlight');
 assertContains(participantView, 'Current question', 'participant current-question card');

@@ -3,8 +3,8 @@
  *
  * Behaviour:
  * - Shown on first visit (no cookie preference stored yet).
- * - "Accept all" → stores consent for analytics + advertising, loads tracking scripts.
- * - "Reject all" → stores refusal, no optional scripts loaded.
+ * - "Accept optional cookies" → stores consent for analytics + advertising, loads tracking scripts.
+ * - "Reject optional cookies" → stores refusal, no optional scripts loaded.
  * - "Manage preferences" → granular toggle panel (analytics / advertising separately).
  * - Consent is stored in localStorage under the key "cookie_consent_v1".
  * - The tracking module (src/lib/tracking.ts) reads this consent before loading any script.
@@ -19,9 +19,9 @@
  * }
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { X, ChevronDown, ChevronUp, Shield } from "lucide-react";
+import { ChevronDown, ChevronUp, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -74,6 +74,7 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
   const [showDetails, setShowDetails] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [advertisingEnabled, setAdvertisingEnabled] = useState(true);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (forceOpen) {
@@ -90,6 +91,12 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
     const stored = getStoredConsent();
     if (!stored) setVisible(true);
   }, [forceOpen]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const frame = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [visible]);
 
   const close = () => {
     setVisible(false);
@@ -114,40 +121,37 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
   if (!visible) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Cookie consent"
-      className="fixed bottom-0 left-0 right-0 z-[9999] p-3 sm:p-4 pointer-events-none"
-    >
-      <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-100 pointer-events-auto overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/45 p-3 pt-12 backdrop-blur-[2px] sm:items-center sm:p-6">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cookie-consent-title"
+        tabIndex={-1}
+        className="max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-[1.75rem] border border-indigo-100 bg-white shadow-2xl shadow-slate-950/30 outline-none"
+      >
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 px-4 pt-4 pb-2">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-indigo-50 rounded-lg">
-              <Shield size={16} className="text-indigo-600" />
+        <div className="border-b border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-indigo-600 p-2.5 shadow-lg shadow-indigo-500/25">
+              <Shield size={20} className="text-white" />
             </div>
-            <p className="text-sm font-semibold text-gray-900">We respect your privacy</p>
+            <div className="min-w-0">
+              <h2 id="cookie-consent-title" className="text-lg font-bold tracking-tight text-slate-950">Your privacy choices</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">Essential cookies keep the service working. Please choose whether optional cookies may help us improve it and measure campaigns.</p>
+            </div>
           </div>
-          <button
-            onClick={handleRejectAll}
-            aria-label="Reject all and close"
-            className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 mt-0.5"
-          >
-            <X size={16} />
-          </button>
         </div>
 
         {/* Body */}
-        <div className="px-4 pb-3">
-          <p className="text-xs text-gray-600 leading-relaxed">
-            We use essential cookies to run the service. Optional analytics and advertising cookies help us improve AIfacilitator and measure campaigns.
-            See our{" "}
-            <Link to="/privacy" className="text-indigo-600 hover:underline" onClick={close}>
+        <div className="px-5 py-4 sm:px-6">
+          <p className="text-sm leading-relaxed text-slate-600">
+            You can change this choice at any time. See our{" "}
+            <Link to="/privacy" className="font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900" onClick={close}>
               Privacy Policy
             </Link>{" "}
-            for full details.
+            for details.
           </p>
 
           {/* Granular preferences panel */}
@@ -196,21 +200,22 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
           {/* Toggle details link */}
           <button
             onClick={() => setShowDetails(v => !v)}
-            className="mt-3 flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 transition-colors"
+            aria-expanded={showDetails}
+            className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100"
           >
-            {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {showDetails ? "Hide preferences" : "Manage preferences"}
+            {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {showDetails ? "Hide privacy choices" : "Manage privacy choices"}
           </button>
         </div>
 
-        {/* Footer buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 px-4 pb-4">
+        {/* Footer buttons: equal-size, explicit consent choices. */}
+        <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/80 px-5 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-4 sm:flex-row sm:px-6">
           {showDetails ? (
             <>
               <Button
                 size="sm"
                 onClick={handleSavePreferences}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs"
+                className="min-h-12 flex-1 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700"
               >
                 Save my preferences
               </Button>
@@ -218,9 +223,9 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
                 size="sm"
                 variant="outline"
                 onClick={handleRejectAll}
-                className="flex-1 rounded-full text-xs border-gray-200 text-gray-600 hover:bg-gray-50"
+                className="min-h-12 flex-1 rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-100"
               >
-                Reject all
+                Reject optional cookies
               </Button>
             </>
           ) : (
@@ -228,17 +233,17 @@ export const CookieBanner = ({ forceOpen = false, onClose }: CookieBannerProps) 
               <Button
                 size="sm"
                 onClick={handleAcceptAll}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs"
+                className="min-h-12 flex-1 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                Accept all
+                Accept optional cookies
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleRejectAll}
-                className="flex-1 rounded-full text-xs border-gray-200 text-gray-600 hover:bg-gray-50"
+                className="min-h-12 flex-1 rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-100"
               >
-                Reject all
+                Reject optional cookies
               </Button>
             </>
           )}

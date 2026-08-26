@@ -9653,8 +9653,10 @@ async def edge_function(func_name: str, request: Request):
             raise HTTPException(400, "conversation_id is required")
         if not participant_name:
             raise HTTPException(400, "participant_name is required")
-
+        if re.fullmatch(r"(?:participant\s+\d+|p\d+)", participant_name, flags=re.IGNORECASE):
+            raise HTTPException(400, "participant_name must be a real display name, not a numbered participant label")
         try:
+
             async with _pool.acquire() as conn:
                 async with conn.transaction():
                     # Serialize participant-slot assignment before the statement snapshot is

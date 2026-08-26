@@ -29,6 +29,9 @@ const autoStartSession = read('src/hooks/useAutoStartSession.ts');
 const hostLogic = read('src/hooks/useSessionHostLogic.ts');
 const sessionState = read('src/hooks/useSessionState.ts');
 const sessionTimer = read('src/hooks/useSessionTimer.ts');
+const joinSessionMain = read('src/components/session/JoinSessionMain.tsx');
+const joinSessionData = read('src/hooks/useJoinSessionData.ts');
+const inputValidation = read('src/utils/inputValidation.ts');
 
 // Voice and typed turns share one durable message boundary.
 assertContains(chatInput, 'message: finalizedMessage', 'speech final callback exports an explicit finalized message snapshot');
@@ -48,6 +51,17 @@ assertContains(sessionTypes, 'handleSendMessage: (messageOverride?: string) => P
 assertContains(messageSaver, 'saveError.code = error.code;', 'message saver preserves structured backend error codes');
 assertContains(messageSender, "structuredError?.code === 'message_service_busy'", 'participant sender identifies retryable message-pool pressure');
 assertContains(messageSender, 'Your text is still in the box; wait a few seconds, then tap Send once.', 'participant sender preserves and explains retryable drafts');
+
+// A numbered seat label is never a participant identity. QR joins require a real
+// display name in the visible form, the client action, schema validation, and server.
+assertContains(inputValidation, 'export const isOrdinalParticipantLabel', 'shared join validation identifies ordinal placeholder labels');
+assertContains(inputValidation, "Use the name other participants should call you", 'schema rejects ordinal placeholder labels with actionable copy');
+assertContains(joinSessionData, 'if (isOrdinalParticipantLabel(participantName))', 'client join action blocks ordinal participant labels before a request');
+assertContains(joinSessionData, 'Use your display name', 'client join action explains the identity requirement');
+assertContains(joinSessionMain, 'placeholder="For example, Maya Chen"', 'QR form gives an unambiguous real-name example');
+assertContains(joinSessionMain, '“Participant 1” is only an internal seat label.', 'QR form explains why ordinal participant labels cannot be used');
+assertContains(joinSessionMain, 'Use your display name to continue', 'QR form prevents an ordinal label from looking join-ready');
+assertContains(fastApiServer, 'participant_name must be a real display name, not a numbered participant label', 'atomic join endpoint rejects ordinal labels that bypass the client');
 
 // The first room message is availability-critical: it is persisted before any
 // provider completion and can therefore never remain indefinitely in preparation.

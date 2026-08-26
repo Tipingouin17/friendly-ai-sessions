@@ -18,6 +18,7 @@ import { useSessionAdminStatus } from "@/hooks/useSessionAdminStatus";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { useParticipantDatabase } from "@/hooks/useParticipantDatabase";
+import { isOrdinalParticipantLabel } from "@/utils/inputValidation";
 
 interface UseJoinSessionDataOptions {
   defaultParticipantName?: string;
@@ -128,6 +129,15 @@ export function useJoinSessionData(
       toast({
         title: "Please enter your name",
         description: "A name is required to join the session.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (isOrdinalParticipantLabel(participantName)) {
+      toast({
+        title: "Use your display name",
+        description: "Enter the name other participants should call you, rather than a numbered participant label.",
         variant: "destructive",
       });
       return null;

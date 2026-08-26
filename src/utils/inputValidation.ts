@@ -203,10 +203,21 @@ export const validateParticipantName = (name: string): { isValid: boolean; error
 };
 
 /**
+ * Ordinal placeholders are internal slot labels, not participant identities.
+ * Keep this intentionally narrow so names such as "Participant Researcher" remain valid.
+ */
+export const isOrdinalParticipantLabel = (value: string | null | undefined): boolean =>
+  /^(?:participant\s+\d+|p\d+)$/i.test((value ?? "").trim());
+
+/**
  * Zod schema for session joining validation
  */
 export const sessionJoinSchema = z.object({
-  participantName: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be less than 50 characters"),
+  participantName: z.string()
+    .trim()
+    .min(2, "Name must be at least 2 characters")
+    .max(50, "Name must be less than 50 characters")
+    .refine((value) => !isOrdinalParticipantLabel(value), "Use the name other participants should call you, not a numbered participant label"),
   avatarSeed: z.string(),
   conversationId: z.number().positive("Invalid conversation ID"),
   isAnonymous: z.boolean().optional().default(false)

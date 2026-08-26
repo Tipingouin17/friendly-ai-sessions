@@ -18,6 +18,7 @@ import SessionFullAlert from "./SessionFullAlert";
 import PreJoinMediaCheck from './PreJoinMediaCheck';
 import { ConversationWithSession } from "@/types/database";
 import { ParticipantInfo } from "@/types/chat";
+import { isOrdinalParticipantLabel } from "@/utils/inputValidation";
 
 interface JoinSessionMainProps {
   conversation: ConversationWithSession | null;
@@ -221,7 +222,9 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
     : `${displayCurrentCount} joined`;
   const totalForAvatarStack = Math.max(displayCurrentCount, joinedParticipants.length);
 
-  const nameIsReady = participantName.trim().length > 0;
+  const enteredName = participantName.trim();
+  const nameUsesOrdinalPlaceholder = isOrdinalParticipantLabel(enteredName);
+  const nameIsReady = enteredName.length > 0 && !nameUsesOrdinalPlaceholder;
   const canJoin = !isJoining && isTokenReady && !isFull && nameIsReady;
 
   return (
@@ -340,13 +343,19 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                   <Input
                     id="name"
                     type="text"
-                    placeholder="Enter your full name…"
+                    placeholder="For example, Maya Chen"
                     value={participantName}
                     onChange={onNameChange}
-                    className="h-12 rounded-2xl border-slate-200 bg-slate-50 px-4 text-base font-medium shadow-sm focus:bg-white focus:border-indigo-400 focus:ring-indigo-200"
+                    aria-describedby={nameUsesOrdinalPlaceholder ? "participant-name-guidance" : undefined}
+                    className={`h-12 rounded-2xl border-slate-200 bg-slate-50 px-4 text-base font-medium shadow-sm focus:bg-white focus:border-indigo-400 focus:ring-indigo-200 ${nameUsesOrdinalPlaceholder ? 'border-amber-400 bg-amber-50 focus:border-amber-500 focus:ring-amber-200' : ''}`}
                     autoComplete="name"
                     autoFocus
                   />
+                  {nameUsesOrdinalPlaceholder && (
+                    <p id="participant-name-guidance" className="text-xs font-medium leading-relaxed text-amber-700">
+                      Please use the name other participants should call you. “Participant 1” is only an internal seat label.
+                    </p>
+                  )}
                 </div>
 
                 {/* ── Step 2: Camera & mic ── */}
@@ -381,7 +390,7 @@ const JoinSessionMain: React.FC<JoinSessionMainProps> = ({
                       </span>
                     ) : !nameIsReady ? (
                       <span className="flex items-center justify-center gap-2 opacity-70">
-                        Enter your name to continue
+                        {nameUsesOrdinalPlaceholder ? 'Use your display name to continue' : 'Enter your name to continue'}
                       </span>
                     ) : (
                       <span className="flex items-center justify-center gap-2">

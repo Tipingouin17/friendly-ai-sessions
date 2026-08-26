@@ -81,6 +81,12 @@ assertContains(participantView, "sidebarTab === 'activity' ? renderMobileActivit
 assertContains(participantView, 'Live transcript is not enabled', 'participant honestly distinguishes durable conversation from unavailable live transcription');
 assertContains(participantView, 'Conversation history is available below.', 'participant explains the available durable context route');
 assertContains(participantView, 'Your response is private until the facilitator combines the group’s answers.', 'silent individual response makes privacy expectation visible before input');
+assertContains(participantView, 'const toParticipantDisplayText', 'Activity normalizes legacy and realtime display payloads before rendering');
+assertContains(participantView, "for (const key of ['content', 'prompt', 'question', 'text', 'message'])", 'Activity extracts text from supported legacy payload shapes');
+assertContains(participantView, 'const activityPrompt = toParticipantDisplayText', 'Activity prompt cannot render a raw non-text payload');
+assertContains(participantView, 'const activityModeLabel = toParticipantDisplayText', 'Activity label cannot render a raw non-text payload');
+assertContains(participantView, 'const activityInstruction = toParticipantDisplayText', 'Activity instruction cannot render a raw non-text payload');
+assertContains(participantView, 'const activityTurnStatus = toParticipantDisplayText', 'Activity status cannot render a raw non-text payload');
 assertContains(participantView, 'renderParticipantComposer(true, true)', 'participant Activity renders one task-first response flow');
 assertContains(participantView, '<SessionVideoGrid', 'participant People tab multi-video grid integration');
 assertContains(participantView, 'variant="participant-sidebar"', 'participant sidebar video grid variant');

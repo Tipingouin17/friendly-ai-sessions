@@ -278,6 +278,23 @@ const formatRemainingTime = (seconds: number | null | undefined): string | null 
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+/**
+ * Active-mode data has legacy and realtime sources. Never let an unexpected JSON
+ * payload reach JSX directly: extract its human text or use the known fallback.
+ */
+const toParticipantDisplayText = (value: unknown, fallback: string): string => {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    for (const key of ['content', 'prompt', 'question', 'text', 'message']) {
+      const candidate = record[key];
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    }
+  }
+  return fallback;
+};
+
 const getFacilitatorPersonaConfig = (
   rawPersonaConfig?: DbFacilitatorPersonaConfig | DbFacilitatorPersonaConfig[] | null
 ): DbFacilitatorPersonaConfig | null => {
@@ -1252,7 +1269,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hasPassiveAudioReadyState = audioUnlocked && voiceRuntime.playbackState === 'idle' && Boolean(lastAssistantMessage);
 
   const renderMobileActivityPanel = () => {
-    const activityPrompt = activeMode?.prompt || latestAssistantMessage?.content || 'The facilitator is preparing the next activity.';
+    const activityPrompt = toParticipantDisplayText(
+      activeMode?.prompt,
+      toParticipantDisplayText(latestAssistantMessage?.content, 'The facilitator is preparing the next activity.')
+    );
+    const activityModeLabel = toParticipantDisplayText(effectiveModeLabel, 'Current activity');
+    const activityInstruction = toParticipantDisplayText(effectiveModeInstruction, 'Follow the facilitator’s guidance for this activity.');
+    const activityTurnStatus = toParticipantDisplayText(facilitatorTurnStatus, 'Preparing the next step');
     const activityTitle = isOpenDiscussionMode
       ? 'Share your perspective'
       : isSilentResponseMode
@@ -1263,7 +1286,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             ? 'Follow the speaking order'
             : isReflectionMode
               ? 'Share a quick check-in'
-              : effectiveModeLabel;
+              : activityModeLabel;
 
     return (
       <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2" aria-label="Current activity">
@@ -1271,13 +1294,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
           <div className="flex items-center justify-between gap-3">
             <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-800">
               <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
-              <span className="truncate">{effectiveModeLabel}</span>
+              <span className="truncate">{activityModeLabel}</span>
             </span>
-            <span className="shrink-0 text-xs font-semibold text-slate-500">{facilitatorTurnStatus}</span>
+            <span className="shrink-0 text-xs font-semibold text-slate-500">{activityTurnStatus}</span>
           </div>
           <h2 className="mt-4 text-lg font-black tracking-tight text-slate-950">{activityTitle}</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-700">{activityPrompt}</p>
-          <p className="mt-3 text-xs leading-relaxed text-slate-500">{effectiveModeInstruction}</p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-500">{activityInstruction}</p>
           {isSilentResponseMode && (
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-800">
               Your response is private until the facilitator combines the group’s answers.

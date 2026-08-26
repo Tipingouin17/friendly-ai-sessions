@@ -493,7 +493,11 @@ export function useWebRTCSession({
     });
 
     record.remoteStream = stream;
-    setRemoteCameraStates((previous) => previous[streamKey] === 'on' ? previous : { ...previous, [streamKey]: 'on' });
+    const hasLiveRemoteVideo = remoteTracks.some((track) => track.kind === 'video' && track.readyState === 'live' && !track.muted);
+    setRemoteCameraStates((previous) => {
+      const nextState: 'on' | 'off' = hasLiveRemoteVideo ? 'on' : 'off';
+      return previous[streamKey] === nextState ? previous : { ...previous, [streamKey]: nextState };
+    });
     setRemoteStreams((previous) => {
       if (previous[streamKey] === stream) return previous;
       return { ...previous, [streamKey]: stream };

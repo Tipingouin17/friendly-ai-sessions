@@ -145,6 +145,7 @@ assertContains(webRTCSession, "remoteCameraStates: Record<string, 'on' | 'off'>"
 assertContains(webRTCSession, "const signalType: WebRTCSignalType = localStream ? 'camera-ready' : 'camera-stopped'", 'host announces both initial camera-on and camera-off state to participant peers');
 assertContains(webRTCSession, 'WEBRTC_CAMERA_READY_STALE_MS = WEBRTC_ICE_STALL_TIMEOUT_MS', 'camera-ready without frames has a bounded negotiation grace period');
 assertContains(webRTCSession, "previous[streamKey] === 'on' ? { ...previous, [streamKey]: 'off' } : previous", 'stale camera-ready state becomes off when no live remote frames arrive');
+assertContains(webRTCSession, "track.kind === 'video' && track.readyState === 'live' && !track.muted", 'remote camera availability requires a live unmuted video track rather than any receiver track');
 assertContains(participantView, 'const hasLiveParticipantVideo = Boolean(remoteStream?.getVideoTracks()', 'participant tile labels require live frames');
 
 // The room must explain normal automatic facilitator flow, not imply a manual command is required.

@@ -327,7 +327,8 @@ test('mobile facilitator voice remains enabled, replayable, and independently au
   assert.match(hostContent, /Play latest reply/);
   assert.match(voiceHook, /FacilitatorVoicePlaybackState/);
   assert.match(voiceHook, /unlockAudio/);
-  assert.match(voiceHook, /data:audio\/wav;base64/);
+  assert.match(voiceHook, /context\.createBufferSource\(\)/);
+  assert.match(voiceHook, /context\.decodeAudioData\(serverResult\.audioData\.slice\(0\)\)/);
 });
 
 test('welcome generation is server-owned, atomically claimed, and scheduled only through the shared post-insert boundary', () => {

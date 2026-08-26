@@ -115,17 +115,31 @@ const DEFAULT_REFLECTION_OPTIONS: AdaptiveModeOption[] = [
   { id: 'confused', label: 'Confused', value: 'confused' },
 ];
 
-const normalizeModeKey = (modeKey?: string | null): string => {
-  const normalized = (modeKey || 'open_discussion').trim().toLowerCase().replace(/-/g, '_');
+const extractModeMetadataText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    for (const key of ['value', 'key', 'slug', 'name', 'label', 'title', 'text']) {
+      const candidate = record[key];
+      if (typeof candidate === 'string' && candidate.trim()) return candidate;
+    }
+  }
+  return '';
+};
+
+const normalizeModeKey = (modeKey?: unknown): string => {
+  const normalized = (extractModeMetadataText(modeKey) || 'open_discussion').trim().toLowerCase().replace(/-/g, '_');
   if (normalized === 'voting') return 'voting_rating';
   if (normalized === 'reflection') return 'reflection_checkin';
   if (normalized === 'silent_response') return 'silent_individual_response';
   return normalized;
 };
 
-const formatModeComponentLabel = (component?: string | null): string => {
-  if (!component) return 'Facilitation mode';
-  return component.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+const formatModeComponentLabel = (component?: unknown): string => {
+  const normalizedComponent = extractModeMetadataText(component);
+  if (!normalizedComponent) return 'Facilitation mode';
+  return normalizedComponent.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
 };
 
 const getModeAccent = (modeKey: string, isComplete?: boolean) => {

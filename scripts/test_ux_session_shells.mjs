@@ -81,6 +81,12 @@ assertContains(participantView, "sidebarTab === 'activity' ? renderMobileActivit
 assertContains(participantView, 'Live transcript is not enabled', 'participant honestly distinguishes durable conversation from unavailable live transcription');
 assertContains(participantView, 'Conversation history is available below.', 'participant explains the available durable context route');
 assertContains(participantView, 'Your response is private until the facilitator combines the group’s answers.', 'silent individual response makes privacy expectation visible before input');
+assertContains(participantView, 'const extractMetadataText', 'participant mode metadata is normalized before string operations');
+assertContains(participantView, 'const normalizeFacilitationModeKey = (modeKey: unknown)', 'participant mode key normalization accepts malformed legacy metadata safely');
+assertContains(participantView, 'const normalizeTechniqueKey = (value: unknown)', 'participant technique normalization accepts malformed legacy metadata safely');
+assertContains(inputFooter, 'const extractModeMetadataText', 'adaptive footer normalizes backend mode metadata before rendering');
+assertContains(inputFooter, 'const normalizeModeKey = (modeKey?: unknown)', 'adaptive footer mode key normalization accepts malformed legacy metadata safely');
+assertContains(inputFooter, 'const formatModeComponentLabel = (component?: unknown)', 'adaptive footer component label formatting accepts malformed legacy metadata safely');
 assertContains(participantView, 'const toParticipantDisplayText', 'Activity normalizes legacy and realtime display payloads before rendering');
 assertContains(participantView, "for (const key of ['content', 'prompt', 'question', 'text', 'message'])", 'Activity extracts text from supported legacy payload shapes');
 assertContains(participantView, 'const activityPrompt = toParticipantDisplayText', 'Activity prompt cannot render a raw non-text payload');

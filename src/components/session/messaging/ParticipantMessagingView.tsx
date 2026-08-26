@@ -185,9 +185,23 @@ type ModeChoice = {
   value: unknown;
 };
 
-const titleizeModeKey = (modeKey: string | null | undefined): string => {
-  if (!modeKey) return 'Open Discussion';
-  return modeKey
+const extractMetadataText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    for (const key of ['value', 'key', 'slug', 'name', 'label', 'title', 'text']) {
+      const candidate = record[key];
+      if (typeof candidate === 'string' && candidate.trim()) return candidate;
+    }
+  }
+  return '';
+};
+
+const titleizeModeKey = (modeKey: unknown): string => {
+  const normalizedModeKey = extractMetadataText(modeKey);
+  if (!normalizedModeKey) return 'Open Discussion';
+  return normalizedModeKey
     .split(/[_-]+/)
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
@@ -226,16 +240,16 @@ const normalizeModeChoices = (options: Record<string, unknown> | unknown): ModeC
     .filter((choice): choice is ModeChoice => Boolean(choice));
 };
 
-const normalizeFacilitationModeKey = (modeKey: string | null | undefined): string => {
-  const normalized = (modeKey || 'open_discussion').trim().toLowerCase().replace(/-/g, '_');
+const normalizeFacilitationModeKey = (modeKey: unknown): string => {
+  const normalized = (extractMetadataText(modeKey) || 'open_discussion').trim().toLowerCase().replace(/-/g, '_');
   if (normalized === 'voting') return 'voting_rating';
   if (normalized === 'reflection') return 'reflection_checkin';
   if (normalized === 'silent_response') return 'silent_individual_response';
   return normalized;
 };
 
-const normalizeTechniqueKey = (value: string | null | undefined): string => {
-  return (value || '')
+const normalizeTechniqueKey = (value: unknown): string => {
+  return extractMetadataText(value)
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
@@ -251,8 +265,9 @@ const inferModeKeyFromTechnique = (techniqueKey: string): string => {
   return 'open_discussion';
 };
 
-const getParticipantModeInstruction = (modeKey: string, composerCopy?: string | null): string => {
-  if (composerCopy?.trim()) return composerCopy.trim();
+const getParticipantModeInstruction = (modeKey: string, composerCopy?: unknown): string => {
+  const normalizedComposerCopy = extractMetadataText(composerCopy).trim();
+  if (normalizedComposerCopy) return normalizedComposerCopy;
   if (modeKey === 'voting_rating') return 'Choose the option or signal that best represents your view.';
   if (modeKey === 'round_robin') return 'The facilitator is guiding participants through turns.';
   if (modeKey === 'reflection_checkin') return 'Choose a quick signal or write a short check-in so the facilitator can sense the room.';
@@ -261,8 +276,9 @@ const getParticipantModeInstruction = (modeKey: string, composerCopy?: string | 
   return 'Share your response when you are ready.';
 };
 
-const getModePlaceholder = (modeKey: string, composerCopy?: string | null): string => {
-  if (composerCopy?.trim()) return composerCopy.trim();
+const getModePlaceholder = (modeKey: string, composerCopy?: unknown): string => {
+  const normalizedComposerCopy = extractMetadataText(composerCopy).trim();
+  if (normalizedComposerCopy) return normalizedComposerCopy;
   if (modeKey === 'round_robin') return 'Your turn will open when the facilitator calls on you…';
   if (modeKey === 'reflection_checkin') return 'Add a quick check-in or one-word reflection…';
   if (modeKey === 'silent_individual_response') return 'Write your private response…';

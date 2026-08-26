@@ -96,6 +96,8 @@ interface UseWebRTCSessionOptions {
 
 interface UseWebRTCSessionResult {
   remoteStreams: Record<string, MediaStream>;
+  /** Last explicit availability announced by each remote camera peer. */
+  remoteCameraStates: Record<string, 'on' | 'off'>;
   isSignalingConnected: boolean;
   connectionStatus: WebRTCConnectionStatus;
   peerStatuses: Record<string, WebRTCPeerStatus>;
@@ -301,6 +303,7 @@ export function useWebRTCSession({
   enabled = true,
 }: UseWebRTCSessionOptions): UseWebRTCSessionResult {
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [remoteCameraStates, setRemoteCameraStates] = useState<Record<string, 'on' | 'off'>>({});
   const [isSignalingConnected, setIsSignalingConnected] = useState(false);
   const [peerStatuses, setPeerStatuses] = useState<Record<string, WebRTCPeerStatus>>({});
   const peersRef = useRef<Map<string, PeerRecord>>(new Map());
@@ -488,6 +491,7 @@ export function useWebRTCSession({
     });
 
     record.remoteStream = stream;
+    setRemoteCameraStates((previous) => previous[streamKey] === 'on' ? previous : { ...previous, [streamKey]: 'on' });
     setRemoteStreams((previous) => {
       if (previous[streamKey] === stream) return previous;
       return { ...previous, [streamKey]: stream };
@@ -800,12 +804,18 @@ export function useWebRTCSession({
 
     if (signal.signalType === 'camera-stopped') {
       if (isSignalOlderThan(signal, WEBRTC_SIGNAL_CATCHUP_LOOKBACK_MS)) return;
+      const remoteParticipantId = parseParticipantIdFromPeerId(signal.fromPeerId);
+      const streamKey = remoteParticipantId === null ? HOST_VIDEO_STREAM_KEY : String(remoteParticipantId);
+      setRemoteCameraStates((previous) => previous[streamKey] === 'off' ? previous : { ...previous, [streamKey]: 'off' });
       removeRemoteStream(signal.fromPeerId);
       return;
     }
 
     if (signal.signalType === 'camera-ready') {
       if (isSignalOlderThan(signal, WEBRTC_SIGNAL_MAX_CAMERA_AGE_MS)) return;
+      const remoteParticipantId = parseParticipantIdFromPeerId(signal.fromPeerId);
+      const streamKey = remoteParticipantId === null ? HOST_VIDEO_STREAM_KEY : String(remoteParticipantId);
+      setRemoteCameraStates((previous) => previous[streamKey] === 'on' ? previous : { ...previous, [streamKey]: 'on' });
       if (isLocalOffererForPeer(signal.fromPeerId)) {
         schedulePeerRenegotiation(signal.fromPeerId);
       }
@@ -1044,6 +1054,18 @@ export function useWebRTCSession({
     });
   }, [conversationId, enabled, localPeerId, localStream, sendSignal]);
 
+  // The host announces initial camera availability when participant peers appear.
+  // Without this state signal, a participant with no remote frames cannot tell a
+  // deliberately-off host camera from an endlessly connecting WebRTC session.
+  const remotePeerIdsKey = remotePeerIds.join('|');
+  useEffect(() => {
+    if (!enabled || !conversationId || role !== 'host' || !localPeerId) return;
+    const signalType: WebRTCSignalType = localStream ? 'camera-ready' : 'camera-stopped';
+    remotePeerIds.forEach((peerId) => {
+      void sendSignal(peerId, { signalType });
+    });
+  }, [conversationId, enabled, localPeerId, localStream, remotePeerIds, remotePeerIdsKey, role, sendSignal]);
+
   useEffect(() => {
     const peers = peersRef.current;
     const pendingCandidates = pendingCandidatesRef.current;
@@ -1064,6 +1086,7 @@ export function useWebRTCSession({
       iceStallTimers.clear();
       setPeerStatuses({});
       setRemoteStreams({});
+      setRemoteCameraStates({});
     };
   }, [conversationId, localPeerId, sendSignal]);
 
@@ -1083,6 +1106,7 @@ export function useWebRTCSession({
 
   return {
     remoteStreams,
+    remoteCameraStates,
     isSignalingConnected,
     connectionStatus,
     peerStatuses,

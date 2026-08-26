@@ -114,6 +114,8 @@ assertContains(sessionTimer, 'const startAt = runtimeStartedAt ?? conversation.c
 assertContains(fastApiServer, "'{runtime_started_at}'", 'atomic start records a schema-supported runtime start timestamp');
 assertContains(hostContent, 'currentParticipantCount={reconciledParticipantCount}', 'active host panel uses the reconciled attendee count');
 assertContains(hostContent, 'maxParticipants={maxParticipants}', 'active host panel uses attendee capacity rather than host-inclusive storage');
+assertContains(sessionContainer, 'const attendeeCapacity = Math.max(1, participantCount - 1)', 'participant active-room capacity normalizes host-inclusive stored capacity');
+assertContains(sessionContainer, 'maxParticipants={attendeeCapacity}', 'participant active-room header receives attendee-only capacity');
 
 // Host camera changes must request renegotiation from the designated participant offerer,
 // without restarting ICE for ordinary camera-ready SDP changes.
@@ -135,8 +137,11 @@ assertContains(hostContent, "track.readyState === 'live' && !track.muted", 'host
 assertContains(hostContent, 'filter((stream) => hasLiveVideoFrames(stream))', 'host room count requires live frames');
 assertContains(hostContent, 'const hasLiveParticipantVideo = hasLiveVideoFrames(remoteStream);', 'host tile label uses live-frame predicate');
 assertNotContains(hostContent, "connectionStatusLabel: remoteStream\n          ? 'Live video'", 'host never labels a stream object alone as live video');
+assertContains(participantView, "hostCameraState === 'off'", 'participant host label uses explicit camera-off state before generic connection status');
 assertContains(participantView, "? 'Host camera is off'", 'mobile participant status explicitly identifies host camera off');
 assertContains(participantView, "'Connecting to host camera'", 'mobile participant status distinguishes setup from host camera off');
+assertContains(webRTCSession, "remoteCameraStates: Record<string, 'on' | 'off'>", 'WebRTC exposes explicit remote camera availability to parent media UI');
+assertContains(webRTCSession, "const signalType: WebRTCSignalType = localStream ? 'camera-ready' : 'camera-stopped'", 'host announces both initial camera-on and camera-off state to participant peers');
 assertContains(participantView, 'const hasLiveParticipantVideo = Boolean(remoteStream?.getVideoTracks()', 'participant tile labels require live frames');
 
 // The room must explain normal automatic facilitator flow, not imply a manual command is required.

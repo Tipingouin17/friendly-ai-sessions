@@ -914,7 +914,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       return first.id - second.id;
     });
   }, [currentParticipantVideoRecord, effectiveParticipantId, participantPeers]);
-  const { remoteStreams, connectionStatus, peerStatuses } = useWebRTCSession({
+  const { remoteStreams, remoteCameraStates, connectionStatus, peerStatuses } = useWebRTCSession({
     conversationId,
     role: 'participant',
     participantId: effectiveParticipantId,
@@ -922,20 +922,27 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     localStream: localCameraStream,
     enabled: !isSessionEnded,
   });
-  const roomConnectionLabel = formatRoomConnectionLabel(connectionStatus);
   const hostRemoteStream = remoteStreams[HOST_VIDEO_STREAM_KEY] ?? null;
   const hasHostVideoFrames = Boolean(hostRemoteStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
+  const hostCameraState = remoteCameraStates[HOST_VIDEO_STREAM_KEY];
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, hasHostVideoFrames);
   const mobileHostVideoStatusLabel = hasHostVideoFrames
     ? 'Host camera is live'
-    : connectionStatus === 'failed'
-      ? 'Connection needs retry'
-      : hostTileConnectionStatus === 'connected'
-        ? 'Host camera is off'
+    : hostCameraState === 'off'
+      ? 'Host camera is off'
+      : connectionStatus === 'failed'
+        ? 'Connection needs retry'
         : connectionStatus === 'disconnected'
           ? 'Reconnecting to host camera'
-          : 'Connecting to host camera';
+          : hostTileConnectionStatus === 'connected'
+            ? 'Host camera is off'
+            : 'Connecting to host camera';
+  const roomConnectionLabel = hasHostVideoFrames
+    ? 'Host camera is live'
+    : hostCameraState === 'off'
+      ? 'Host camera is off'
+      : formatRoomConnectionLabel(connectionStatus);
   const hostDisplayName = resolveHostDisplayName(hostParticipant);
   const cameraIsOn = cameraStatus === 'on' && Boolean(localCameraStream?.getVideoTracks().some((track) => track.readyState !== 'ended'));
   const facilitatorVideoTile: SessionVideoParticipant = {

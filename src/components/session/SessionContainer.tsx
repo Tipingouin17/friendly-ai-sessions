@@ -124,6 +124,10 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   // Debug logging for messages
   useEffect(() => { /* no-op */ }, [messages.length, currentParticipant, hasAnswered]);
 
+  // conversations.participants includes the host. Participant-facing capacity is
+  // attendee-only, consistent with join, waiting-room, and host seat displays.
+  const attendeeCapacity = Math.max(1, participantCount - 1);
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Main content area - admin header is now handled by AdminDashboard */}
@@ -139,7 +143,7 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
           participants={participants}
           conversationId={conversationId}
           currentParticipantCount={currentParticipantCount}
-          maxParticipants={participantCount}
+          maxParticipants={attendeeCapacity}
           isMobile={isMobile}
           viewMode={viewMode}
           isAdmin={isAdmin}

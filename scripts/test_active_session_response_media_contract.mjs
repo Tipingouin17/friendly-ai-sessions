@@ -137,6 +137,7 @@ assertContains(hostContent, "track.readyState === 'live' && !track.muted", 'host
 assertContains(hostContent, 'filter((stream) => hasLiveVideoFrames(stream))', 'host room count requires live frames');
 assertContains(hostContent, 'const hasLiveParticipantVideo = hasLiveVideoFrames(remoteStream);', 'host tile label uses live-frame predicate');
 assertNotContains(hostContent, "connectionStatusLabel: remoteStream\n          ? 'Live video'", 'host never labels a stream object alone as live video');
+assertContains(participantView, "const hostCameraState = remoteCameraStates[HOST_VIDEO_STREAM_KEY] ?? 'off'", 'participant defaults an absent camera catch-up signal to host camera off');
 assertContains(participantView, "hostCameraState === 'off'", 'participant host label uses explicit camera-off state before generic connection status');
 assertContains(participantView, "? 'Host camera is off'", 'mobile participant status explicitly identifies host camera off');
 assertContains(participantView, "'Connecting to host camera'", 'mobile participant status distinguishes setup from host camera off');

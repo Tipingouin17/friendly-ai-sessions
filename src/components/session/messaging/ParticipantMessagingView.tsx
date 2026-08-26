@@ -925,7 +925,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const hostRemoteStream = remoteStreams[HOST_VIDEO_STREAM_KEY] ?? null;
   const hasHostVideoFrames = Boolean(hostRemoteStream?.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted));
   const hostPeerStatus = peerStatuses[HOST_VIDEO_STREAM_KEY];
-  const hostCameraState = remoteCameraStates[HOST_VIDEO_STREAM_KEY];
+  // A host camera is opt-in. Treat an absent catch-up signal as off until a
+  // camera-ready event or an actual live host track proves availability.
+  const hostCameraState = remoteCameraStates[HOST_VIDEO_STREAM_KEY] ?? 'off';
   const hostTileConnectionStatus = getPeerTileConnectionStatus(hostPeerStatus, hasHostVideoFrames);
   const mobileHostVideoStatusLabel = hasHostVideoFrames
     ? 'Host camera is live'

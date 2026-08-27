@@ -613,7 +613,7 @@ export function useFacilitatorVoice({
       const isAutoplayBlocked = playError instanceof DOMException && playError.name === 'NotAllowedError';
       if (isAutoplayBlocked) {
         setPlaybackState('blocked');
-        setPlaybackError('Tap Enable ElevenLabs audio, then use Play latest reply.');
+        setPlaybackError('Tap Enable sound, then use Play facilitator response.');
         audioElementRef.current = null;
         _revokeAudioUrl();
         void updateTtsEventStatus(activeEventIdRef.current, 'failed', {

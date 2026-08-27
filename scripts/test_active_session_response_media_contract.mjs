@@ -161,6 +161,11 @@ assertContains(participantView, 'Hear facilitator responses', 'mobile Activity e
 assertContains(participantView, 'Tap once to enable sound on this phone.', 'mobile Activity explains the required browser gesture without provider jargon');
 assertContains(participantView, 'Enable sound', 'mobile participant receives a compact provider-neutral sound action');
 assertNotContains(participantView, 'Enable ElevenLabs audio', 'mobile participant does not see infrastructure-provider branding in the production sound action');
+assertContains(participantView, "const spokenText = toParticipantDisplayText(lastAssistantMessage.content, '');", 'participant normalizes legacy facilitator message content before speech preparation');
+assertContains(participantView, 'const preparedSpeech = prepareFacilitatorSpeechText(spokenText);', 'participant gives the TTS pipeline only normalized text');
+assertNotContains(participantView, 'text: spokenText || lastAssistantMessage.content,', 'participant never passes raw legacy message content to the audio runtime');
+assertContains(facilitatorVoice, 'Tap Enable sound, then use Play facilitator response.', 'runtime playback recovery remains provider-neutral');
+assertNotContains(facilitatorVoice, 'Enable ElevenLabs audio', 'runtime error copy does not reintroduce provider branding');
 assertContains(participantView, 'manualReplayInProgressRef', 'mobile replay has a synchronous pre-render tap guard');
 assertContains(participantView, 'disabled={isAudioPlaybackBusy}', 'mobile replay is disabled while preparing or playing');
 assertNotContains(participantView, 'line-clamp-4 text-xs leading-relaxed text-slate-700', 'mobile chat never truncates a facilitator message after four lines');

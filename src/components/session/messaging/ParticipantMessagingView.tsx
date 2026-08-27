@@ -1062,9 +1062,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     if (!lastAssistantMessage || playbackBusy || manualReplayInProgressRef.current) return;
     manualReplayInProgressRef.current = true;
     const messageId = String(lastAssistantMessage.id);
-    const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
+    const spokenText = toParticipantDisplayText(lastAssistantMessage.content, '');
+    const preparedSpeech = prepareFacilitatorSpeechText(spokenText);
+    if (!preparedSpeech) {
+      manualReplayInProgressRef.current = false;
+      return;
+    }
     void voiceRuntime.speak({
-      text: spokenText || lastAssistantMessage.content,
+      text: preparedSpeech,
       messageId,
       metadata: { source: 'participant_manual_tts_replay' },
     }).finally(() => {
@@ -1092,9 +1097,11 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     // analytics event from another participant must never suppress this client.
     lastSpokenAssistantMessageRef.current = messageId;
     if (typeof window !== 'undefined') window.sessionStorage.setItem(browserReplayKey, '1');
-    const spokenText = prepareFacilitatorSpeechText(lastAssistantMessage.content);
+    const spokenText = toParticipantDisplayText(lastAssistantMessage.content, '');
+    const preparedSpeech = prepareFacilitatorSpeechText(spokenText);
+    if (!preparedSpeech) return;
     void voiceRuntime.speak({
-      text: spokenText || lastAssistantMessage.content,
+      text: preparedSpeech,
       messageId,
       metadata: { source: 'participant_messaging_view' },
     });

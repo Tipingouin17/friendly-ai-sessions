@@ -157,7 +157,10 @@ assertContains(facilitatorVoice, "new Blob([serverResult.audioData], { type: 'au
 assertContains(facilitatorVoice, 'mediaErrorCode: mediaErrorCode ?? null', 'server playback failures retain a non-sensitive concrete media diagnostic');
 assertNotContains(facilitatorVoice, "unlocked = context.state === 'running';\n        void context.close();", 'the audio-enable gesture does not close the context needed for delayed Android playback');
 assertContains(facilitatorVoice, "if (context && context.state !== 'closed') void context.close();", 'the retained context is closed only during hook cleanup');
-assertContains(participantView, 'Enable ElevenLabs audio', 'mobile participant sees the configured provider in the permission action');
+assertContains(participantView, 'Hear facilitator responses', 'mobile Activity explains the participant benefit before the one required audio gesture');
+assertContains(participantView, 'Tap once to enable sound on this phone.', 'mobile Activity explains the required browser gesture without provider jargon');
+assertContains(participantView, 'Enable sound', 'mobile participant receives a compact provider-neutral sound action');
+assertNotContains(participantView, 'Enable ElevenLabs audio', 'mobile participant does not see infrastructure-provider branding in the production sound action');
 assertContains(participantView, 'manualReplayInProgressRef', 'mobile replay has a synchronous pre-render tap guard');
 assertContains(participantView, 'disabled={isAudioPlaybackBusy}', 'mobile replay is disabled while preparing or playing');
 assertNotContains(participantView, 'line-clamp-4 text-xs leading-relaxed text-slate-700', 'mobile chat never truncates a facilitator message after four lines');
@@ -170,7 +173,9 @@ assertContains(participantView, 'renderMobileActivityPanel', 'mobile Activity ow
 assertContains(participantView, 'renderParticipantComposer(true, true)', 'mobile reply surface is rendered inside the current Activity rather than below every tab');
 assertContains(inputFooter, 'Reply to the discussion', 'mobile reply dock has a clear primary-task label');
 assertContains(inputFooter, 'Session options', 'secondary participant controls use a single explicit progressive-disclosure control');
-assertContains(participantView, "hasPassiveAudioReadyState ? 'hidden md:block' : 'shrink-0'", 'ready audio guidance compacts on phones after the initial enable action');
+assertContains(participantView, 'className={`hidden shrink-0 border-b px-3 py-2.5 md:block ${', 'detailed shared audio status is desktop-only and cannot displace phone workshop content');
+assertContains(participantView, "ttsAvatarEnabled && !audioUnlocked", 'mobile Activity retains the required one-time sound unlock affordance');
+assertContains(participantView, "voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked'", 'mobile Activity retains sound recovery only when playback needs participant action');
 assertContains(participantView, 'className="hidden mt-2 grid grid-cols-2 gap-2 md:hidden"', 'duplicate mobile camera-state cards do not consume the initial reply viewport');
 assertContains(inputFooter, 'compactParticipantDock?: boolean;', 'input footer supports the participant phone reply dock without a second composer implementation');
 assertContains(inputFooter, 'taskFirstMobile?: boolean;', 'input footer supports a task-first Activity surface without duplicating mode context');

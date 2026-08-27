@@ -1323,9 +1323,31 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               Your response is private until the facilitator combines the group’s answers.
             </p>
           )}
+          {ttsAvatarEnabled && !audioUnlocked && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5" role="status">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-indigo-950">Hear facilitator responses</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-indigo-800">Tap once to enable sound on this phone.</p>
+              </div>
+              <button type="button" onClick={handleEnableFacilitatorAudio} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95">
+                <Volume2 className="h-4 w-4" /> Enable sound
+              </button>
+            </div>
+          )}
+          {ttsAvatarEnabled && audioUnlocked && (voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked') && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5" role="status">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-rose-950">{voiceRuntime.playbackState === 'blocked' ? 'Sound needs a tap' : 'Facilitator sound could not play'}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-rose-800">{voiceRuntime.playbackError ?? 'Tap the sound action to try the latest response again.'}</p>
+              </div>
+              <button type="button" onClick={voiceRuntime.playbackState === 'blocked' ? handleEnableFacilitatorAudio : replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3 text-xs font-bold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
+                <Volume2 className="h-4 w-4" /> Try sound
+              </button>
+            </div>
+          )}
           {hasPassiveAudioReadyState && ttsAvatarEnabled && (
             <button type="button" onClick={replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-bold text-indigo-800 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60">
-              <Play className="h-3.5 w-3.5 fill-current" /> {isAudioPlaybackBusy ? 'Preparing audio…' : 'Play facilitator response'}
+              <Play className="h-3.5 w-3.5 fill-current" /> {isAudioPlaybackBusy ? 'Preparing sound…' : 'Play facilitator response'}
             </button>
           )}
         </div>
@@ -1452,7 +1474,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
         <section
           role="status"
           aria-live="polite"
-          className={`${hasPassiveAudioReadyState ? 'hidden md:block' : 'shrink-0'} border-b px-3 py-2.5 ${
+          className={`hidden shrink-0 border-b px-3 py-2.5 md:block ${
             !ttsAvatarEnabled
               ? 'border-amber-200 bg-amber-50 text-amber-900'
               : voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked'
@@ -1470,7 +1492,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               <div className="min-w-0">
                 <p className="text-sm font-bold">
                   {!ttsAvatarEnabled ? 'Facilitator voice is unavailable'
-                    : !audioUnlocked ? 'Enable ElevenLabs audio'
+                    : !audioUnlocked ? 'Enable sound'
                     : voiceRuntime.playbackState === 'preparing' ? 'Preparing the facilitator voice…'
                     : voiceRuntime.playbackState === 'playing' ? 'Facilitator is speaking'
                     : voiceRuntime.playbackState === 'blocked' ? 'Audio needs your tap'
@@ -1480,14 +1502,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
                 </p>
                 <p className={`text-xs leading-relaxed opacity-80 ${audioUnlocked && voiceRuntime.playbackState === 'idle' ? 'hidden md:block' : ''}`}>
                   {!ttsAvatarEnabled ? 'Voice was disabled in the session configuration.'
-                    : !audioUnlocked ? 'Tap Enable ElevenLabs audio once, then every facilitator reply can play on this phone.'
+                    : !audioUnlocked ? 'Tap Enable sound once, then every facilitator reply can play on this device.'
                     : voiceRuntime.playbackError ?? (lastAssistantMessage ? 'Use Play latest reply to hear the most recent facilitator message.' : 'Audio is prepared; the welcome will play when it is available.')}
                 </p>
               </div>
             </div>
             {!audioUnlocked && ttsAvatarEnabled ? (
               <button type="button" onClick={handleEnableFacilitatorAudio} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95">
-                <Volume2 className="h-4 w-4" /> Enable ElevenLabs audio
+                <Volume2 className="h-4 w-4" /> Enable sound
               </button>
             ) : lastAssistantMessage && ttsAvatarEnabled ? (
               <button type="button" onClick={replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-current/20 bg-white/80 px-3 py-2 text-xs font-bold shadow-sm transition hover:bg-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">

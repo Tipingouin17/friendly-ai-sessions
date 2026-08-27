@@ -320,7 +320,9 @@ test('mobile facilitator voice remains enabled, replayable, and independently au
   assert.match(participantView, /phase3Settings\?\.tts_avatar_enabled !== false/);
   assert.match(participantView, /!audioUnlocked \|\| !lastAssistantMessage/);
   assert.doesNotMatch(participantView, /hasTtsEventForMessage/);
-  assert.match(participantView, /Enable ElevenLabs audio/);
+  assert.match(participantView, /Hear facilitator responses/);
+  assert.match(participantView, /Enable sound/);
+  assert.doesNotMatch(participantView, /Enable ElevenLabs audio/);
   assert.match(participantView, /Play latest reply/);
   assert.match(participantView, /Facilitator audio is ready/);
   assert.match(hostContent, /!audioUnlocked \|\| !latestFacilitatorMessage/);

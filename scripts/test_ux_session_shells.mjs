@@ -156,10 +156,13 @@ assertNotContains(participantView, 'hasTtsEventForMessage', 'participant playbac
 assertContains(participantView, 'facilitator-tts-spoken:${conversationId}:${messageId}', 'participant replay guard remains scoped to the local browser session');
 assertContains(participantView, 'const messageId = String(lastAssistantMessage.id);', 'participant serializes assistant message id before speech tracking');
 assertContains(participantView, 'lastSpokenAssistantMessageRef.current = messageId;', 'participant speech replay guard uses serialized message id');
-assertContains(participantView, 'Enable ElevenLabs audio', 'participant exposes an explicit provider-specific mobile audio-enable state');
+assertContains(participantView, 'Hear facilitator responses', 'participant explains the benefit of the compact mobile sound enable action');
+assertContains(participantView, 'Enable sound', 'participant exposes a provider-neutral mobile sound-enable action');
+assertNotContains(participantView, 'Enable ElevenLabs audio', 'participant production surface does not expose provider implementation branding');
 assertContains(participantView, 'Play latest reply', 'participant exposes a visible replay action for facilitator audio');
 assertContains(participantView, 'hasPassiveAudioReadyState', 'participant identifies passive audio-ready state separately from active audio errors');
-assertContains(participantView, "hasPassiveAudioReadyState ? 'hidden md:block' : 'shrink-0'", 'passive audio status does not displace the mobile task viewport');
+assertContains(participantView, 'className={`hidden shrink-0 border-b px-3 py-2.5 md:block ${', 'detailed passive audio status remains desktop-only and does not displace the mobile task viewport');
+assertContains(participantView, 'Tap once to enable sound on this phone.', 'the phone-only Activity consent explains the required browser gesture concisely');
 assertContains(participantView, 'Play facilitator response', 'Activity retains a compact replay action when passive audio status is hidden on a phone');
 assertContains(chatInput, 'Listening — speak your response', 'voice capture has a dedicated readable recording state');
 assertContains(chatInput, 'Tap Stop to review your draft before sending.', 'voice capture requires participant review before durable send');

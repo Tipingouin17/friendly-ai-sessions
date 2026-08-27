@@ -431,6 +431,17 @@ function getParticipantReadConversationId(path: string): string | null {
   }
 }
 
+function getParticipantTranscriptionConversationId(path: string): string | null {
+  try {
+    const url = new URL(path, window.location.origin);
+    if (url.pathname !== '/api/stt/transcribe') return null;
+    const conversationId = url.searchParams.get('conversation_id');
+    return conversationId && /^[0-9]+$/.test(conversationId) ? conversationId : null;
+  } catch {
+    return null;
+  }
+}
+
 function isParticipantRoute(): boolean {
   try {
     return !window.location.pathname.startsWith('/session/host');
@@ -451,7 +462,10 @@ async function apiFetch<T>(
     // Resolve both forms without ever borrowing a token from another session.
     const participantMutationConversationId = getParticipantMutationConversationId(path, options.body);
     const participantReadConversationId = getParticipantReadConversationId(path);
-    const participantScopedConversationId = participantMutationConversationId ?? participantReadConversationId;
+    const participantTranscriptionConversationId = getParticipantTranscriptionConversationId(path);
+    const participantScopedConversationId = participantMutationConversationId
+      ?? participantReadConversationId
+      ?? participantTranscriptionConversationId;
     const joinToken = getJoinToken(participantScopedConversationId);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -465,7 +479,7 @@ async function apiFetch<T>(
     // hydrate the participant room, even when the browser retains a separate
     // saved app login.
     const joinTokenIsAuthoritative = Boolean(participantMutationConversationId)
-      || (Boolean(participantReadConversationId) && isParticipantRoute());
+      || ((Boolean(participantReadConversationId) || Boolean(participantTranscriptionConversationId)) && isParticipantRoute());
     if (joinToken && (!token || joinTokenIsAuthoritative)) {
       headers["X-Join-Token"] = joinToken;
     }
@@ -1036,6 +1050,40 @@ export const storage = {
     };
   },
 };
+
+// ─── Recorded-response transcription ─────────────────────────────────────────
+
+export interface RecordedResponseTranscriptionPayload {
+  conversationId: number;
+  audioBase64: string;
+  mimeType: string;
+  durationMs: number;
+  language?: string;
+}
+
+export async function transcribeRecordedResponse(
+  payload: RecordedResponseTranscriptionPayload,
+): Promise<{ text: string | null; error: ApiError | null }> {
+  if (!Number.isFinite(payload.conversationId) || payload.conversationId <= 0) {
+    return { text: null, error: { message: 'A valid session is required for voice transcription.', code: 'invalid_conversation' } };
+  }
+  const response = await apiFetch<{ text?: unknown }>(
+    `/api/stt/transcribe?conversation_id=${encodeURIComponent(String(payload.conversationId))}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        conversation_id: payload.conversationId,
+        audio_base64: payload.audioBase64,
+        mime_type: payload.mimeType,
+        duration_ms: payload.durationMs,
+        language: payload.language,
+      }),
+      timeoutMs: 45_000,
+    },
+  );
+  const text = typeof response.data?.text === 'string' ? response.data.text.trim() : '';
+  return { text: text || null, error: response.error };
+}
 
 // ─── Edge Functions ───────────────────────────────────────────────────────────
 

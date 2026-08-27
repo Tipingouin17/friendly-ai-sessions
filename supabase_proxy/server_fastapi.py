@@ -2476,6 +2476,23 @@ async def log_all_requests(request: Request, call_next):
     client = request.client
     client_ip = client.host if client else "unknown"
     log_req.debug("%s %s from %s (origin=%s)", request.method, request.url.path, client_ip, request.headers.get('origin', '-'))
+    # Reject the bounded in-memory recorded-response payload before FastAPI/Pydantic
+    # reads and decodes it. Fetch requests include Content-Length; the endpoint also
+    # enforces the decoded size for absent or malformed headers.
+    if request.method == "POST" and request.url.path == "/api/stt/transcribe":
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > 7 * 1024 * 1024:
+                    return JSONResponse(status_code=413, content={"detail": {
+                        "code": "recording_too_large",
+                        "message": "This recording is too large to transcribe. Keep your response under one minute.",
+                    }})
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": {
+                    "code": "invalid_recording_request",
+                    "message": "The recording request could not be read.",
+                }})
     response = await call_next(request)
     log_req.debug("%s %s -> %d", request.method, request.url.path, response.status_code)
     return response
@@ -10595,11 +10612,179 @@ if __name__ == "__main__":
 # ============================================================
 # Activated via VITE_PHASE3_TTS_PROVIDER=server and
 # VITE_PHASE3_TTS_ENDPOINT=/api/tts/synthesize on the frontend.
-# Falls back gracefully: if PHASE3_TTS_API_KEY is not set or the
-# upstream call fails, the frontend is expected to fall back to
-# browser SpeechSynthesis.
+# If PHASE3_TTS_API_KEY is absent or the upstream call fails, this endpoint
+# returns a bounded error. Participant clients expose a provider-neutral retry
+# path rather than silently changing the configured facilitator voice.
 
 from pydantic import BaseModel as _PydanticBaseModel
+
+
+class RecordedResponseTranscriptionRequest(_PydanticBaseModel):
+    """A short, user-confirmed participant recording held only in request memory."""
+    conversation_id: int
+    audio_base64: str
+    mime_type: str
+    duration_ms: int
+    language: Optional[str] = None
+
+
+# This endpoint intentionally accepts a small base64 JSON payload rather than a
+# multipart upload. Starlette's multipart parser may spool large uploads to a
+# temporary file; base64 keeps this strictly in process memory.  The browser
+# records only after a participant action and asks for a second confirmation
+# before the data is sent for transcription.
+_STT_MAX_AUDIO_BYTES = 5 * 1024 * 1024
+_STT_MIN_DURATION_MS = 1_000
+_STT_MAX_DURATION_MS = 60_000
+_STT_ALLOWED_MIME_TYPES = {
+    "audio/mp4", "audio/x-m4a", "audio/aac", "audio/webm",
+    "audio/ogg", "audio/opus", "audio/wav", "audio/x-wav",
+    "audio/mpeg", "audio/mp3",
+}
+
+
+@app.post("/api/stt/transcribe")
+@limiter.limit("12/minute")
+async def api_transcribe_recorded_response(
+    request: Request,
+    payload: RecordedResponseTranscriptionRequest,
+):
+    """Transcribe one short, explicitly confirmed participant recording.
+
+    Audio bytes are accepted only in-memory, relayed to ElevenLabs, and then
+    discarded.  The endpoint returns editable text only; it never stores audio,
+    transcript text, filenames, or provider credentials in logs or the database.
+    """
+    import base64
+    import binascii
+    import time as _time
+    import httpx as _httpx
+
+    content_length = request.headers.get("content-length")
+    # Base64 expands audio by roughly one third. Reject obviously oversized
+    # requests before decoding them; the decoded-size check below is authoritative.
+    if content_length:
+        try:
+            if int(content_length) > 7 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail={
+                    "code": "recording_too_large",
+                    "message": "This recording is too large to transcribe. Keep your response under one minute.",
+                })
+        except ValueError:
+            raise HTTPException(status_code=400, detail={
+                "code": "invalid_recording_request",
+                "message": "The recording request could not be read.",
+            })
+
+    try:
+        conversation_id = int(payload.conversation_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail={
+            "code": "invalid_conversation",
+            "message": "A valid session is required for transcription.",
+        })
+    await _require_conversation_access(request, conversation_id)
+
+    mime_type = (payload.mime_type or "").split(";", 1)[0].strip().lower()
+    if mime_type not in _STT_ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=415, detail={
+            "code": "unsupported_recording_format",
+            "message": "This browser's recording format is not supported. Please type your response instead.",
+        })
+    if not isinstance(payload.duration_ms, int) or not _STT_MIN_DURATION_MS <= payload.duration_ms <= _STT_MAX_DURATION_MS:
+        raise HTTPException(status_code=400, detail={
+            "code": "invalid_recording_duration",
+            "message": "Record a response between one second and one minute, then try again.",
+        })
+
+    try:
+        audio_bytes = base64.b64decode(payload.audio_base64, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(status_code=400, detail={
+            "code": "invalid_recording_data",
+            "message": "The recording could not be read. Please record it again or type your response.",
+        })
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail={
+            "code": "empty_recording",
+            "message": "No audio was captured. Please record again or type your response.",
+        })
+    if len(audio_bytes) > _STT_MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail={
+            "code": "recording_too_large",
+            "message": "This recording is too large to transcribe. Keep your response under one minute.",
+        })
+
+    api_key = (os.environ.get("PHASE3_STT_API_KEY") or os.environ.get("PHASE3_TTS_API_KEY") or "").strip()
+    if not api_key:
+        logger.warning("[STT] provider not configured | conv=%s", conversation_id)
+        raise HTTPException(status_code=503, detail={
+            "code": "transcription_unavailable",
+            "message": "Voice transcription is temporarily unavailable. You can still type your response.",
+        })
+
+    language = (payload.language or "").strip().split("-", 1)[0].lower()
+    form_data: Dict[str, str] = {
+        "model_id": "scribe_v2",
+        "timestamps_granularity": "none",
+        "tag_audio_events": "false",
+        "diarize": "false",
+    }
+    if language and 2 <= len(language) <= 3 and language.isalpha():
+        form_data["language_code"] = language
+    suffix = {
+        "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac",
+        "audio/webm": "webm", "audio/ogg": "ogg", "audio/opus": "opus",
+        "audio/wav": "wav", "audio/x-wav": "wav", "audio/mpeg": "mp3", "audio/mp3": "mp3",
+    }[mime_type]
+    started_at = _time.monotonic()
+    try:
+        timeout = _httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+        async with _httpx.AsyncClient(timeout=timeout) as client:
+            provider_response = await client.post(
+                "https://api.elevenlabs.io/v1/speech-to-text",
+                headers={"xi-api-key": api_key},
+                data=form_data,
+                files={"file": (f"response.{suffix}", audio_bytes, mime_type)},
+            )
+    except _httpx.TimeoutException as exc:
+        logger.warning("[STT] provider timeout | conv=%s bytes=%s duration_ms=%s elapsed_ms=%s", conversation_id, len(audio_bytes), payload.duration_ms, int((_time.monotonic() - started_at) * 1000))
+        raise HTTPException(status_code=504, detail={
+            "code": "transcription_timed_out",
+            "message": "Voice transcription took too long. Please try again or type your response.",
+        }) from exc
+    except _httpx.HTTPError as exc:
+        logger.warning("[STT] provider request failed | conv=%s bytes=%s duration_ms=%s error=%s", conversation_id, len(audio_bytes), payload.duration_ms, type(exc).__name__)
+        raise HTTPException(status_code=503, detail={
+            "code": "transcription_unavailable",
+            "message": "Voice transcription is temporarily unavailable. You can still type your response.",
+        }) from exc
+
+    elapsed_ms = int((_time.monotonic() - started_at) * 1000)
+    if provider_response.status_code != 200:
+        logger.warning("[STT] provider response | conv=%s bytes=%s duration_ms=%s status=%s elapsed_ms=%s", conversation_id, len(audio_bytes), payload.duration_ms, provider_response.status_code, elapsed_ms)
+        raise HTTPException(status_code=503, detail={
+            "code": "transcription_unavailable",
+            "message": "Voice transcription is temporarily unavailable. You can still type your response.",
+        })
+    try:
+        transcription = provider_response.json().get("text", "")
+    except ValueError as exc:
+        logger.warning("[STT] invalid provider response | conv=%s bytes=%s duration_ms=%s elapsed_ms=%s", conversation_id, len(audio_bytes), payload.duration_ms, elapsed_ms)
+        raise HTTPException(status_code=502, detail={
+            "code": "transcription_response_invalid",
+            "message": "Voice transcription returned an invalid response. Please type your response.",
+        }) from exc
+    text = transcription.strip() if isinstance(transcription, str) else ""
+    if not text:
+        logger.info("[STT] empty result | conv=%s bytes=%s duration_ms=%s elapsed_ms=%s", conversation_id, len(audio_bytes), payload.duration_ms, elapsed_ms)
+        raise HTTPException(status_code=422, detail={
+            "code": "transcription_empty",
+            "message": "No speech was detected. Please record again or type your response.",
+        })
+    logger.info("[STT] completed | conv=%s bytes=%s duration_ms=%s elapsed_ms=%s", conversation_id, len(audio_bytes), payload.duration_ms, elapsed_ms)
+    return {"text": text[:2000]}
+
 
 class TtsSynthesizeRequest(_PydanticBaseModel):
     text: str
@@ -10675,9 +10860,9 @@ async def api_tts_synthesize(req: TtsSynthesizeRequest, request: Request):
     `model_id`, `voice_preset`, `conversation_id`, `message_id`, and
     `metadata`. Returns audio/mpeg binary on success.
 
-    The endpoint requires PHASE3_TTS_API_KEY (ElevenLabs key) to be set
-    in the Railway environment. If it is absent or the upstream call fails,
-    it returns HTTP 503 so the frontend can fall back to browser TTS.
+    The endpoint requires PHASE3_TTS_API_KEY to be set in the Railway
+    environment. If it is absent or the upstream call fails, it returns a
+    bounded HTTP 503 so participant clients can offer a provider-neutral retry.
     """
     import httpx as _httpx
 

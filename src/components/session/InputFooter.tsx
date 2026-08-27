@@ -368,7 +368,7 @@ const InputFooter = ({
   ) : null;
 
   const renderOpenDiscussionPanel = () => {
-    const chatInput = <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />;
+    const chatInput = <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} conversationId={conversationId} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />;
 
     if (compactParticipantDock) {
       return (
@@ -432,7 +432,7 @@ const InputFooter = ({
           {isCurrent ? <MicLiveIndicator isLive={isRecording} label={isRecording ? 'Mic live' : 'Floor open'} /> : null}
         </div>
         <div className="border-t border-slate-100 p-3">
-          <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
+          <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} conversationId={conversationId} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
         </div>
       </div>
     );
@@ -440,7 +440,7 @@ const InputFooter = ({
 
   const renderSilentResponsePanel = () => (
     <div className="mx-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:mx-4">
-      <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
+      <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} conversationId={conversationId} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700"><span className="inline-flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> AI will combine all answers</span><span>{inputMessage.length}/2000</span></div>
       <p className="sr-only" aria-live="polite">Silent response mode is active. Your answer is private until the facilitator synthesizes responses.</p>
     </div>
@@ -485,7 +485,7 @@ const InputFooter = ({
       {floorGranted && (
         <div className="mt-3 border-t border-red-100 pt-3">
           <p className="mb-2 text-xs font-semibold text-emerald-800">You have the floor. Share your concise point with the room.</p>
-          <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder="Share your point with the room…" disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
+          <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder="Share your point with the room…" disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} conversationId={conversationId} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />
         </div>
       )}
     </div>
@@ -523,7 +523,7 @@ const InputFooter = ({
             ) : (
               <ParticipantEngagementControls status={status} onSkip={skipQuestion} onTogglePause={togglePause} onSendHostMessage={sendMessageToHost} isSendingHostMessage={isSendingHostMessage} hostMessageSent={hostMessageSent} hasAnswered={hasAnswered} isMobile={isMobile} />
             )}
-            {shouldRenderDefaultChatInput && <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />}
+            {shouldRenderDefaultChatInput && <ChatInput inputMessage={inputMessage} setInputMessage={setInputMessage} onSendMessage={onSendMessage} isRecording={isRecording} setIsRecording={setIsRecording} placeholder={!shouldAllowAnswer && disabledPlaceholder ? disabledPlaceholder : placeholder} disabled={!shouldAllowAnswer} isMobile={isMobile} speechEnabled={speechEnabled} speechLanguage={speechLanguage} conversationId={conversationId} onSpeechInterim={onSpeechInterim} onSpeechFinal={onSpeechFinal} />}
             {!modeContext && !isPaused && !isSkipped && <div className="px-3 pb-2 sm:px-4"><QuickReactions onReaction={onReaction} compact={isMobile} /></div>}
           </div>
         ) : (

@@ -155,8 +155,56 @@ assertContains(apiClient, 'function getParticipantReadConversationId(path: strin
 assertContains(apiClient, "const filterKey = table === 'conversations'", 'conversation detail reads use their exact id filter while child resources use conversation_id');
 assertContains(apiClient, "rawConversationId?.match(/^eq\\.([0-9]+)$/)?.[1]", 'participant bootstrap reads accept only an exact numeric equality scope');
 assertContains(apiClient, 'const participantReadConversationId = getParticipantReadConversationId(path);', 'API transport resolves all approved participant reads alongside writes');
-assertContains(apiClient, '(Boolean(participantReadConversationId) && isParticipantRoute())', 'participant routes attach their scoped token to each approved read after host start');
+assertContains(apiClient, 'Boolean(participantReadConversationId) || Boolean(participantTranscriptionConversationId)', 'participant routes keep both approved reads and transcription token-scoped');
 assertContains(apiClient, "!window.location.pathname.startsWith('/session/host')", 'host-owned reads never borrow a participant join token');
+
+// Recorded-response transcription is an explicit, privacy-preserving fallback
+// for unavailable native dictation. The browser keeps audio in memory, obtains
+// an exact room token, and returns only an editable draft—never an auto-send.
+const sttServerStart = fastApiServer.indexOf('class RecordedResponseTranscriptionRequest');
+const sttServerEnd = fastApiServer.indexOf('class TtsSynthesizeRequest', sttServerStart);
+assert.ok(sttServerStart >= 0 && sttServerEnd > sttServerStart, 'backend should contain an isolated recorded-response transcription section');
+const sttServer = fastApiServer.slice(sttServerStart, sttServerEnd);
+const recordedTranscriptionHandlerStart = chatInput.indexOf('const handleTranscribeRecordedResponse');
+const recordedTranscriptionHandlerEnd = chatInput.indexOf('const handleStartNativeRecording', recordedTranscriptionHandlerStart);
+assert.ok(recordedTranscriptionHandlerStart >= 0 && recordedTranscriptionHandlerEnd > recordedTranscriptionHandlerStart, 'client should contain an isolated recorded-response handler');
+const recordedTranscriptionHandler = chatInput.slice(recordedTranscriptionHandlerStart, recordedTranscriptionHandlerEnd);
+assertContains(sttServer, '@app.post("/api/stt/transcribe")', 'backend exposes a dedicated transcription relay');
+assertContains(sttServer, '@limiter.limit("12/minute")', 'transcription relay has a bounded abuse rate');
+assertContains(sttServer, 'await _require_conversation_access(request, conversation_id)', 'transcription requires scoped room access');
+assertContains(sttServer, '_STT_MAX_AUDIO_BYTES = 5 * 1024 * 1024', 'transcription caps decoded audio bytes');
+assertContains(sttServer, '_STT_MIN_DURATION_MS = 1_000', 'transcription requires a meaningful one-second minimum');
+assertContains(sttServer, '_STT_MAX_DURATION_MS = 60_000', 'transcription caps recording duration at one minute');
+assertContains(sttServer, 'base64.b64decode(payload.audio_base64, validate=True)', 'transcription validates base64 before provider transport');
+assertContains(sttServer, 'if len(audio_bytes) > _STT_MAX_AUDIO_BYTES:', 'transcription rejects oversized decoded audio before provider transport');
+assertContains(sttServer, '"audio/mp4"', 'transcription allowlists Safari-compatible MP4 audio');
+assertContains(sttServer, '"audio/webm"', 'transcription allowlists Chromium-compatible WebM audio');
+assertContains(sttServer, '"https://api.elevenlabs.io/v1/speech-to-text"', 'transcription uses the server-side speech endpoint');
+assertContains(sttServer, 'headers={"xi-api-key": api_key}', 'provider credentials remain server-side');
+assertContains(sttServer, '"text": text[:2000]', 'relay returns bounded editable text only');
+assertNotContains(sttServer, 'INSERT INTO', 'transcription endpoint never persists audio or text to the database');
+assertNotContains(sttServer, 'open(', 'transcription endpoint never writes a temporary audio file');
+assertContains(fastApiServer, 'request.url.path == "/api/stt/transcribe"', 'global middleware rejects oversized STT JSON before body parsing');
+assertContains(apiClient, 'function getParticipantTranscriptionConversationId(path: string): string | null', 'API transport resolves only the dedicated transcription route');
+assertContains(apiClient, "url.pathname !== '/api/stt/transcribe'", 'transcription token resolver rejects every other API route');
+assertContains(apiClient, 'getJoinToken(participantScopedConversationId)', 'transcription joins the exact conversation-scoped token path');
+assertContains(apiClient, '`/api/stt/transcribe?conversation_id=${encodeURIComponent(String(payload.conversationId))}`', 'typed transcription request carries the same conversation scope in its URL');
+assertContains(apiClient, 'timeoutMs: 45_000', 'typed transcription client has a bounded long-operation timeout');
+assert.equal((inputFooter.match(/conversationId=\{conversationId\}/g) ?? []).length, 5, 'every adaptive ChatInput path forwards the active conversation ID');
+assertContains(chatInput, 'isIosWebKit()', 'iPhone WebKit selects recording fallback rather than unreliable advertised recognition');
+assertContains(chatInput, 'navigator.mediaDevices.getUserMedia({ audio: true })', 'recording fallback requests microphone access only after participant action');
+assertContains(chatInput, 'MIN_RECORDED_RESPONSE_MS = 1_000', 'client prevents impractically short recordings');
+assertContains(chatInput, 'MAX_RECORDED_RESPONSE_MS = 60_000', 'client stops recordings at one minute');
+assertContains(chatInput, 'MAX_RECORDED_RESPONSE_BYTES = 4 * 1024 * 1024', 'client checks blob size before base64 expansion');
+assertContains(chatInput, 'recordingStreamRef.current?.getTracks().forEach((track) => track.stop())', 'recording stream tracks are released on every terminal path');
+assertContains(chatInput, 'Recording ready for transcription', 'recording ends in an explicit review-and-consent card');
+assertContains(chatInput, 'sent securely for transcription and discarded after processing', 'consent card discloses the bounded transfer and discard behavior');
+assertContains(chatInput, 'Transcribe recording', 'recording requires a second explicit transcription action');
+assertContains(chatInput, 'You can review and edit the text before sending it.', 'consent card guarantees review-before-send');
+assertContains(recordedTranscriptionHandler, 'setInputMessage(combined.trim().slice(0, MAX_MESSAGE_LENGTH))', 'successful transcription becomes an editable composer draft');
+assertContains(recordedTranscriptionHandler, 'discardRecordedResponse();', 'successful transcription releases the in-memory recording');
+assertNotContains(recordedTranscriptionHandler, 'onSendMessage(', 'recorded transcription never auto-sends a durable participant message');
+assertNotContains(chatInput, 'ElevenLabs', 'participant-facing voice transcription copy remains provider-neutral');
 
 // Server-configured participant voice is explicitly ElevenLabs-only: never a
 // hidden browser speech fallback, and stale synthesis work cannot replay.

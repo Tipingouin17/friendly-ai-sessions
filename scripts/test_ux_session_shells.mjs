@@ -168,7 +168,7 @@ assertContains(participantView, 'Tap once to enable sound on this phone.', 'the 
 assertContains(participantView, 'Play facilitator response', 'Activity retains a compact replay action when passive audio status is hidden on a phone');
 assertContains(chatInput, 'Listening — speak your response', 'voice capture has a dedicated readable recording state');
 assertContains(chatInput, 'Tap Stop to review your draft before sending.', 'voice capture requires participant review before durable send');
-assertContains(chatInput, "disabled={!inputMessage.trim() || disabled || isOverLimit || isRecording}", 'voice capture prevents Send while recognition is active');
+assertContains(chatInput, "disabled={!inputMessage.trim() || disabled || isOverLimit || isAnyRecording || recordedResponseState === 'transcribing'}", 'voice capture prevents Send while native or recorded-response capture is active');
 assertNotContains(chatInput, 'absolute bottom-2 left-3 flex items-center', 'voice state no longer overlays the text placeholder');
 
 assertContains(hostContent, 'PanelGroup direction="horizontal"', 'host resizable command center');

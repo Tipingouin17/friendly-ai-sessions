@@ -73,6 +73,7 @@ assertContains(joinSessionContainer, 'const requiresDisplayNameCorrection', 'leg
 assertContains(joinSessionContainer, '!requiresDisplayNameCorrection', 'legacy ordinal identities cannot silently auto-redirect back into a session');
 assertContains(participantJoining, 'isOrdinalParticipantLabel(sessionData.name) && !isOrdinalParticipantLabel(participantName)', 'legacy identity correction routes a real name through the device-bound atomic update');
 assertContains(participantJoining, 'updates the existing slot without consuming another seat', 'legacy identity correction documents its capacity-safe rejoin behavior');
+assertContains(participantJoining, 'import api, { getJoinToken, setJoinToken } from "@/lib/api";', 'QR join imports the scoped token persistence helper at runtime');
 assertContains(participantJoining, 'setJoinToken(joinToken, String(conversationId));', 'successful QR join explicitly persists the scoped token before participant session navigation');
 assertContains(participantJoining, 'cannot retain a participant identity while losing the scoped', 'successful QR join documents durable transcript authorization on mobile navigation');
 

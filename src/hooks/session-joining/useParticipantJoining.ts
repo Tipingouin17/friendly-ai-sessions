@@ -7,7 +7,7 @@
  * caused 20-35 s join latency.
  */
 
-import api, { getJoinToken } from "@/lib/api";
+import api, { getJoinToken, setJoinToken } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useParticipantPersistence } from "@/hooks/useParticipantPersistence";
 import { getOrCreateDeviceId } from "@/hooks/useDeviceId";

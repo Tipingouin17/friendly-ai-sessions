@@ -164,6 +164,7 @@ assertNotContains(participantView, 'Enable ElevenLabs audio', 'mobile participan
 assertContains(participantView, "const spokenText = toParticipantDisplayText(lastAssistantMessage.content, '');", 'participant normalizes legacy facilitator message content before speech preparation');
 assertContains(participantView, 'const preparedSpeech = prepareFacilitatorSpeechText(spokenText);', 'participant gives the TTS pipeline only normalized text');
 assertNotContains(participantView, 'text: spokenText || lastAssistantMessage.content,', 'participant never passes raw legacy message content to the audio runtime');
+assertContains(facilitatorVoice, "const trimmed = typeof text === 'string' ? text.trim() : '';", 'shared voice runtime rejects malformed non-text playback input before calling trim');
 assertContains(facilitatorVoice, 'Tap Enable sound, then use Play facilitator response.', 'runtime playback recovery remains provider-neutral');
 assertNotContains(facilitatorVoice, 'Enable ElevenLabs audio', 'runtime error copy does not reintroduce provider branding');
 assertContains(participantView, 'manualReplayInProgressRef', 'mobile replay has a synchronous pre-render tap guard');

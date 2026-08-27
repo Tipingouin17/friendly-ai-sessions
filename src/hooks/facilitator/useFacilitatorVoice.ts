@@ -434,7 +434,9 @@ export function useFacilitatorVoice({
 
   // ── Server TTS speak path ─────────────────────────────────────────────────
   const speakViaServer = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
-    const trimmed = text.trim();
+    // Realtime and legacy integrations can violate the compile-time message shape.
+    // The shared playback boundary must never crash a participant action on raw JSON.
+    const trimmed = typeof text === 'string' ? text.trim() : '';
     const serializedMessageId = messageId != null ? String(messageId) : null;
     if (!enabled || !trimmed || !conversationId || !effectiveEndpoint) return;
 
@@ -628,7 +630,8 @@ export function useFacilitatorVoice({
 
   // ── Browser TTS speak path ────────────────────────────────────────────────
   const speakViaBrowser = React.useCallback(async ({ text, messageId = null, metadata = {} }: SpeakParams) => {
-    const trimmed = text.trim();
+    // Keep the non-server fallback equally defensive for callers outside the participant room.
+    const trimmed = typeof text === 'string' ? text.trim() : '';
     const serializedMessageId = messageId != null ? String(messageId) : null;
     if (!enabled || !trimmed || !conversationId) return;
 

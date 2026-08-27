@@ -25,6 +25,7 @@ import { HOST_VIDEO_STREAM_KEY, useWebRTCSession, type WebRTCConnectionStatus, t
 import { updateModeParticipantState, type FacilitatorModeAssignment, type ModeInput, type ModeParticipantState, type SessionActiveMode, type SessionModeEvent } from '@/services/modeOrchestratorService';
 import { persistParticipantMediaPreferences, readParticipantMediaPreferences } from '@/utils/participantMediaPreferences';
 import { prepareFacilitatorSpeechText } from '@/utils/prepareFacilitatorSpeechText';
+import { readPersistedParticipantSession } from '@/hooks/useParticipantPersistence';
 
 interface ParticipantMessagingViewProps {
   messages: Message[];
@@ -397,13 +398,28 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   const localCameraRequestIdRef = React.useRef(0);
   const autoCameraRestoreKeyRef = React.useRef<string | null>(null);
   const isSessionEnded = conversationData?.is_session_ended || conversationData?.status === 'completed';
+  // Session participant hydration can briefly omit the local attendee after a
+  // mobile reload. The device-bound, conversation-scoped join record is the
+  // canonical fallback for the attendee's own name—not the ordinal seat id.
+  const persistedParticipantSession = React.useMemo(
+    () => conversationId ? readPersistedParticipantSession(conversationId) : null,
+    [conversationId]
+  );
+  const canonicalParticipantNames = React.useMemo(() => {
+    const persistedName = persistedParticipantSession?.name?.trim();
+    const persistedParticipantId = persistedParticipantSession?.participantId;
+    if (!persistedName || isGenericParticipantLabel(persistedName) || !Number.isFinite(persistedParticipantId) || persistedParticipantId <= 0) {
+      return participantNames;
+    }
+    return { ...participantNames, [persistedParticipantId]: persistedName };
+  }, [participantNames, persistedParticipantSession]);
   const activeParticipants = React.useMemo(() => {
     if (participants.length > 0) {
       return participants.map((participant) => ({
         ...participant,
         name: isHostParticipant(participant)
           ? resolveHostDisplayName(participant)
-          : resolveStoredParticipantName(participant, participantNames),
+          : resolveStoredParticipantName(participant, canonicalParticipantNames),
       }));
     }
 
@@ -411,10 +427,10 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       const participantId = index + 1;
       return {
         id: participantId,
-        name: participantNames[participantId]?.trim() || `Participant ${participantId}`,
+        name: canonicalParticipantNames[participantId]?.trim() || `Participant ${participantId}`,
       } as ParticipantInfo;
     });
-  }, [currentParticipantCount, participantNames, participants]);
+  }, [canonicalParticipantNames, currentParticipantCount, participants]);
   const hostParticipant = React.useMemo(
     () => activeParticipants.find(isHostParticipant) ?? null,
     [activeParticipants]
@@ -446,7 +462,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     messages,
     viewMode: "participant",
     participants: participantPeers,
-    participantNames,
+    participantNames: canonicalParticipantNames,
     currentParticipant: effectiveParticipantId
   });
 
@@ -592,16 +608,16 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
       ? participantPeers.find((candidate) => candidate.id === numericParticipantId)
       : undefined;
 
-    if (participant) return resolveStoredParticipantName(participant, participantNames);
+    if (participant) return resolveStoredParticipantName(participant, canonicalParticipantNames);
 
-    const mappedName = Number.isFinite(numericParticipantId) ? participantNames[numericParticipantId]?.trim() : undefined;
+    const mappedName = Number.isFinite(numericParticipantId) ? canonicalParticipantNames[numericParticipantId]?.trim() : undefined;
     if (mappedName && !isGenericParticipantLabel(mappedName)) return mappedName;
 
     const cleanedFallback = fallbackName?.trim();
     if (cleanedFallback && !isGenericParticipantLabel(cleanedFallback) && cleanedFallback !== 'You') return cleanedFallback;
 
     return Number.isFinite(numericParticipantId) && numericParticipantId > 0 ? `Participant ${numericParticipantId}` : 'Participant';
-  }, [participantPeers, participantNames]);
+  }, [canonicalParticipantNames, participantPeers]);
 
   const recentChatMessages = React.useMemo(() => {
     return [...messages]
@@ -939,13 +955,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     const knownParticipant = participantPeers.find((participant) => participant.id === effectiveParticipantId);
     if (knownParticipant) return knownParticipant;
 
-    const mappedName = participantNames[effectiveParticipantId]?.trim();
+    const mappedName = canonicalParticipantNames[effectiveParticipantId]?.trim();
     return {
       id: effectiveParticipantId,
       name: mappedName && !isGenericParticipantLabel(mappedName) ? mappedName : `Participant ${effectiveParticipantId}`,
       avatarSeed: currentParticipantAvatarSeed || undefined,
     } as ParticipantInfo;
-  }, [currentParticipantAvatarSeed, effectiveParticipantId, participantNames, participantPeers]);
+  }, [canonicalParticipantNames, currentParticipantAvatarSeed, effectiveParticipantId, participantPeers]);
 
   const orderedVideoParticipants = React.useMemo(() => {
     const participantById = new Map<number, ParticipantInfo>();
@@ -1393,7 +1409,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     <InputFooter
       participantCount={maxParticipants}
       currentParticipant={effectiveParticipantId}
-      participantNames={participantNames}
+      participantNames={canonicalParticipantNames}
       participants={participantPeers}
       inputMessage={inputMessage}
       setInputMessage={setInputMessage}

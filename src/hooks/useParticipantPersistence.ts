@@ -38,7 +38,7 @@ export interface ParticipantSessionData {
  * Falls back to the legacy flat key `participantSessionData` for users
  * upgrading from an older build.
  */
-function readSessionFromStorage(conversationId?: number): ParticipantSessionData | null {
+export function readPersistedParticipantSession(conversationId?: number): ParticipantSessionData | null {
   try {
     // Try the scoped key first.
     const scopedKey = conversationId
@@ -77,7 +77,7 @@ export function readParticipantDataByDevice(
   conversationId: number,
   deviceId: string
 ): ParticipantSessionData | null {
-  const data = readSessionFromStorage(conversationId);
+  const data = readPersistedParticipantSession(conversationId);
   if (!data) return null;
   // If the stored entry has no deviceId (legacy entry from before this feature
   // was introduced), we cannot verify ownership — treat as unmatched so the
@@ -153,11 +153,11 @@ export function useParticipantPersistence() {
    * Does NOT trigger state updates or localStorage writes.
    */
   const getSessionByConversationId = useCallback((conversationId: number): ParticipantSessionData | null => {
-    return readSessionFromStorage(conversationId);
+    return readPersistedParticipantSession(conversationId);
   }, []);
 
   const updateSessionAccessTime = useCallback((conversationId: number) => {
-    const sessionData = readSessionFromStorage(conversationId);
+    const sessionData = readPersistedParticipantSession(conversationId);
     if (sessionData) {
       const updatedData = {
         ...sessionData,

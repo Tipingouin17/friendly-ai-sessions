@@ -275,3 +275,13 @@ assertContains(participantLoadingShell, 'env(safe-area-inset-bottom)', 'waiting 
 assertContains(participantLoadingShell, '<details className="group rounded-2xl', 'nonessential session details are collapsible on mobile');
 
 console.log('Active-session response and media contract checks passed.');
+
+// Participant mobile reloads can resolve the local seat before the shared
+// participant list hydrates. The device-bound QR name remains canonical in every
+// participant-facing fallback, rather than degrading to an ordinal seat label.
+assertContains(participantView, "import { readPersistedParticipantSession } from '@/hooks/useParticipantPersistence';", 'participant People and video fallbacks read the conversation-scoped QR identity when live participant hydration is delayed');
+assertContains(participantView, 'const canonicalParticipantNames = React.useMemo', 'participant view builds one canonical identity map rather than independent ordinal fallbacks');
+assertContains(participantView, 'const mappedName = canonicalParticipantNames[effectiveParticipantId]?.trim();', 'current participant video record prefers the persisted canonical name over an ordinal seat fallback');
+assertContains(participantView, 'participantNames: canonicalParticipantNames', 'participant transcript processing receives the canonical identity map during delayed hydration');
+assertContains(participantView, 'participantNames={canonicalParticipantNames}', 'participant composer receives the canonical identity map during delayed hydration');
+assertContains(participantView, 'conversationId ? readPersistedParticipantSession(conversationId) : null', 'canonical participant identity remains conversation-scoped and never leaks across rooms');

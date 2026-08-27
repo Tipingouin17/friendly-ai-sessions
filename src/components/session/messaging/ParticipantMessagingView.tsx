@@ -370,6 +370,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   enabledModes = [],
   activeMode = null,
   participantModeState = null,
+  isMobile,
   recentModeEvents = [],
   isLoadingModes = false,
   modeError = null,

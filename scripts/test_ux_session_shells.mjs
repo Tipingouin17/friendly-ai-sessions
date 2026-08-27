@@ -73,6 +73,7 @@ assertContains(participantView, 'Your response is registered', 'participant visi
 assertContains(participantView, 'effectiveResponseCount', 'participant response counter uses local registration fallback');
 assertContains(participantView, 'Math.max(isOpenDiscussionMode ? responseCount : 0, hasRegisteredResponse ? 1 : 0)', 'participant local response counter preserves own completion without leaking prior open-discussion counts into structured modes');
 assertContains(participantView, "type SidebarTab = 'activity' | 'conversation' | 'people'", 'participant uses stable Activity, Conversation, and People destinations');
+assertContains(participantView, '  isMobile,\n  recentModeEvents = [],', 'participant receives the required mobile viewport prop before using it for initial navigation');
 assertContains(participantView, "React.useState<SidebarTab>(isMobile ? 'activity' : 'conversation')", 'participant defaults phones to the current activity and desktop to conversation context');
 assertContains(participantView, "aria-pressed={sidebarTab === 'activity'}", 'participant mobile Activity tab exposes active pressed state');
 assertContains(participantView, "aria-pressed={sidebarTab === 'conversation'}", 'participant mobile Conversation tab exposes active pressed state');

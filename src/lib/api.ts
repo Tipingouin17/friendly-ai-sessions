@@ -391,11 +391,39 @@ function getParticipantMutationConversationId(path: string, body: RequestInit['b
  * conversation ID in the PostgREST query rather than a request body, so parse
  * the exact equality filter and keep the token scoped to that conversation.
  */
-function getParticipantMessageReadConversationId(path: string): string | null {
-  if (!path.startsWith('/rest/v1/messages')) return null;
+const PARTICIPANT_SCOPED_READ_TABLES = new Set([
+  'messages',
+  'session_participants',
+  'session_events',
+  'facilitator_tts_events',
+  'session_active_modes',
+  'session_mode_events',
+  'mode_participant_states',
+  'mode_inputs',
+]);
+
+/**
+ * Participant room bootstrap and live state are spread across several
+ * conversation-bound resources. Every entry in this whitelist maps to a
+ * backend-approved participant-readable table, and only an exact `eq.<id>`
+ * filter may select the token. That keeps the token least-privilege while
+ * ensuring a fresh mobile QR join can hydrate its room, mode, people, and
+ * transcript after the host starts.
+ */
+function getParticipantReadConversationId(path: string): string | null {
   try {
-    const query = new URL(path, window.location.origin).searchParams;
-    const rawConversationId = query.get('conversation_id');
+    const url = new URL(path, window.location.origin);
+    const table = url.pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
+    if (!table) return null;
+
+    const filterKey = table === 'conversations'
+      ? 'id'
+      : PARTICIPANT_SCOPED_READ_TABLES.has(table)
+        ? 'conversation_id'
+        : null;
+    if (!filterKey) return null;
+
+    const rawConversationId = url.searchParams.get(filterKey);
     const conversationId = rawConversationId?.match(/^eq\.([0-9]+)$/)?.[1];
     return conversationId && Number.isFinite(Number(conversationId)) ? conversationId : null;
   } catch {
@@ -422,7 +450,7 @@ async function apiFetch<T>(
     // durable message read that follows host start carries it in the query.
     // Resolve both forms without ever borrowing a token from another session.
     const participantMutationConversationId = getParticipantMutationConversationId(path, options.body);
-    const participantReadConversationId = getParticipantMessageReadConversationId(path);
+    const participantReadConversationId = getParticipantReadConversationId(path);
     const participantScopedConversationId = participantMutationConversationId ?? participantReadConversationId;
     const joinToken = getJoinToken(participantScopedConversationId);
     const headers: Record<string, string> = {
@@ -433,8 +461,9 @@ async function apiFetch<T>(
     if (token) headers["Authorization"] = `Bearer ${token}`;
     // Normal authenticated host navigation remains ownership-scoped. On a
     // participant route, the scoped join token is authoritative for ordinary
-    // participant writes *and* the durable /messages read that follows a host
-    // start, even when the browser retains a separate saved app login.
+    // participant writes and every whitelisted conversation-bound read used to
+    // hydrate the participant room, even when the browser retains a separate
+    // saved app login.
     const joinTokenIsAuthoritative = Boolean(participantMutationConversationId)
       || (Boolean(participantReadConversationId) && isParticipantRoute());
     if (joinToken && (!token || joinTokenIsAuthoritative)) {

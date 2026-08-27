@@ -287,7 +287,7 @@ test('participant messages and WebRTC signals retain conversation-scoped join-to
   const webrtc = readFileSync(resolve(repoRoot, 'src/hooks/useWebRTCSession.ts'), 'utf8');
 
   assert.match(api, /getParticipantMutationConversationId/);
-  assert.match(api, /getParticipantMessageReadConversationId/);
+  assert.match(api, /getParticipantReadConversationId/);
   assert.match(api, /isParticipantMessage/);
   assert.match(api, /isWebRtcSignal/);
   assert.match(api, /conversation_id/);

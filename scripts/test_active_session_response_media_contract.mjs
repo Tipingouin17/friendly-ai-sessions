@@ -147,12 +147,16 @@ assertContains(fastApiServer, 'if not await _validate_join_token(join_token_head
 assertNotContains(fastApiServer, 'IMPORTANT: Always acquires its own connection from the pool', 'join-token validator no longer documents unsafe nested acquisition');
 assertContains(fastApiServer, 'The budget applies only while waiting for a pool slot.', 'interactive reads and messages bound acquisition without cancelling owned work');
 assertContains(fastApiServer, '_pool_pressure_snapshot()', 'pool-pressure diagnostics are retained for future operational triage');
-assertContains(apiClient, 'function getParticipantMessageReadConversationId(path: string): string | null', 'participant durable message reads have an explicit query-scoped conversation resolver');
-assertContains(apiClient, "const rawConversationId = query.get('conversation_id');", 'participant durable message reads parse their exact PostgREST conversation filter');
-assertContains(apiClient, "rawConversationId?.match(/^eq\\.([0-9]+)$/)?.[1]", 'participant durable message reads accept only an exact numeric equality scope');
-assertContains(apiClient, 'const participantReadConversationId = getParticipantMessageReadConversationId(path);', 'API transport resolves participant message reads alongside writes');
-assertContains(apiClient, '(Boolean(participantReadConversationId) && isParticipantRoute())', 'participant routes attach their scoped token to durable message reads after host start');
-assertContains(apiClient, "!window.location.pathname.startsWith('/session/host')", 'host-owned message reads never borrow a participant join token');
+assertContains(apiClient, 'const PARTICIPANT_SCOPED_READ_TABLES = new Set([', 'participant bootstrap reads use an explicit least-privilege table allowlist');
+assertContains(apiClient, "'session_participants'", 'participant people hydration remains covered by the scoped read allowlist');
+assertContains(apiClient, "'session_active_modes'", 'participant active-mode hydration remains covered by the scoped read allowlist');
+assertContains(apiClient, "'mode_participant_states'", 'participant mode-state hydration remains covered by the scoped read allowlist');
+assertContains(apiClient, 'function getParticipantReadConversationId(path: string): string | null', 'participant bootstrap reads have a canonical query-scoped conversation resolver');
+assertContains(apiClient, "const filterKey = table === 'conversations'", 'conversation detail reads use their exact id filter while child resources use conversation_id');
+assertContains(apiClient, "rawConversationId?.match(/^eq\\.([0-9]+)$/)?.[1]", 'participant bootstrap reads accept only an exact numeric equality scope');
+assertContains(apiClient, 'const participantReadConversationId = getParticipantReadConversationId(path);', 'API transport resolves all approved participant reads alongside writes');
+assertContains(apiClient, '(Boolean(participantReadConversationId) && isParticipantRoute())', 'participant routes attach their scoped token to each approved read after host start');
+assertContains(apiClient, "!window.location.pathname.startsWith('/session/host')", 'host-owned reads never borrow a participant join token');
 
 // Server-configured participant voice is explicitly ElevenLabs-only: never a
 // hidden browser speech fallback, and stale synthesis work cannot replay.

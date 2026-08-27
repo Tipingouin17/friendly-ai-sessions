@@ -207,7 +207,7 @@ export const validateParticipantName = (name: string): { isValid: boolean; error
  * Keep this intentionally narrow so names such as "Participant Researcher" remain valid.
  */
 export const isOrdinalParticipantLabel = (value: string | null | undefined): boolean =>
-  /^(?:participant\s+\d+|p\d+)$/i.test((value ?? "").trim());
+  /^(?:participant\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)|p\d+)$/i.test((value ?? "").trim());
 
 /**
  * Zod schema for session joining validation

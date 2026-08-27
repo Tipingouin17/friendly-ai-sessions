@@ -33,6 +33,7 @@ const joinSessionMain = read('src/components/session/JoinSessionMain.tsx');
 const joinSessionData = read('src/hooks/useJoinSessionData.ts');
 const joinSessionContainer = read('src/components/session/JoinSessionContainer.tsx');
 const participantJoining = read('src/hooks/session-joining/useParticipantJoining.ts');
+const messageList = read('src/components/chat/MessageList.tsx');
 const inputValidation = read('src/utils/inputValidation.ts');
 const speechText = read('src/utils/prepareFacilitatorSpeechText.ts');
 const participantSessionPage = read('src/pages/Session.tsx');
@@ -184,6 +185,13 @@ assertContains(inputFooter, 'Reply to the discussion', 'mobile reply dock has a 
 assertContains(inputFooter, 'Session options', 'secondary participant controls use a single explicit progressive-disclosure control');
 assertContains(participantView, 'className={`hidden shrink-0 border-b px-3 py-2.5 md:block ${', 'detailed shared audio status is desktop-only and cannot displace phone workshop content');
 assertContains(participantView, "ttsAvatarEnabled && !audioUnlocked", 'mobile Activity retains the required one-time sound unlock affordance');
+
+// A real name entered at QR join must win over a stale ordinal slot label until
+// participant hydration has caught up, and word-form labels must be rejected too.
+assertContains(inputValidation, 'one|two|three|four|five|six|seven|eight|nine|ten', 'word-form ordinal participant labels are rejected at join time');
+assertContains(messageSaver, 'isOrdinalParticipantLabel(hydratedName) && urlName', 'durable participant messages prefer a real QR name over stale ordinal hydration');
+assertContains(messageList, 'isOrdinalParticipantLabel(hydratedParticipant.name)', 'transcript reconciliation identifies stale ordinal hydrated names');
+assertContains(messageList, 'persistedParticipantName &&\n            !isOrdinalParticipantLabel(persistedParticipantName)', 'transcript reconciliation retains a durable real name over an ordinal fallback');
 assertContains(participantView, "voiceRuntime.playbackState === 'failed' || voiceRuntime.playbackState === 'blocked'", 'mobile Activity retains sound recovery only when playback needs participant action');
 assertContains(participantView, 'className="hidden mt-2 grid grid-cols-2 gap-2 md:hidden"', 'duplicate mobile camera-state cards do not consume the initial reply viewport');
 assertContains(inputFooter, 'compactParticipantDock?: boolean;', 'input footer supports the participant phone reply dock without a second composer implementation');

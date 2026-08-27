@@ -7,6 +7,7 @@
 import api from "@/lib/api";
 import { Message } from "@/types/chat";
 import { nanoid } from "nanoid";
+import { isOrdinalParticipantLabel } from "@/utils/inputValidation";
 
 type SaveMessageProps = {
   message: string;
@@ -38,9 +39,16 @@ export const useMessageSaver = () => {
 
     const currentParticipantKey = String(effectiveParticipantId);
 
-    // Resolve participant name: use participantInfo, then URL name param, then fallback
+    // The route name is captured at the explicit QR join boundary. If the
+    // participant list is temporarily stale and still exposes an internal
+    // ordinal slot label, preserve the attendee's real entered name instead.
     const urlName = urlParams.get('name') || undefined;
-    const resolvedName = participantInfo?.name || urlName || `Participant ${effectiveParticipantId}`;
+    const hydratedName = typeof participantInfo?.name === 'string' ? participantInfo.name : undefined;
+    const resolvedName = (
+      isOrdinalParticipantLabel(hydratedName) && urlName && !isOrdinalParticipantLabel(urlName)
+        ? urlName
+        : hydratedName || urlName || `Participant ${effectiveParticipantId}`
+    );
 
     // Create message for UI
     const messageId = nanoid();

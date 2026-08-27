@@ -11,6 +11,7 @@
 import React, { useMemo } from 'react';
 import { Message, ParticipantInfo } from '@/types/chat';
 import { getParticipantColor } from '@/utils/sessionHelpers';
+import { isOrdinalParticipantLabel } from '@/utils/inputValidation';
 import MessageItem from './MessageItem';
 import ThinkingIndicator from './ThinkingIndicator';
 import WaitingForResponsesIndicator from './WaitingForResponsesIndicator';
@@ -80,15 +81,25 @@ const MessageList = ({
         const participantNumber = parseInt(message.participant, 10);
         if (!isNaN(participantNumber)) {
           const persistedParticipantName = (message as Message & { displayName?: string }).displayName || message.name;
-          participantInfo = participants.find(p => p.id === participantNumber) ?? (
-            participantNumber > 0
-              ? {
-                id: participantNumber,
-                name: persistedParticipantName || `Participant ${participantNumber}`,
-                avatar: message.avatar ?? null,
-              }
-              : null
-          );
+          const hydratedParticipant = participants.find(p => p.id === participantNumber);
+          // A numbered participant label is an internal seat fallback, never a
+          // preferred identity. If a durable turn already carries the attendee's
+          // real name, retain it while participant hydration catches up.
+          participantInfo = hydratedParticipant && !(
+            isOrdinalParticipantLabel(hydratedParticipant.name) &&
+            persistedParticipantName &&
+            !isOrdinalParticipantLabel(persistedParticipantName)
+          )
+            ? hydratedParticipant
+            : (
+              participantNumber > 0
+                ? {
+                  id: participantNumber,
+                  name: persistedParticipantName || `Participant ${participantNumber}`,
+                  avatar: message.avatar ?? null,
+                }
+                : null
+            );
         }
       }
 

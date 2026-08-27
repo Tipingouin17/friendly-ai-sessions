@@ -378,10 +378,12 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
 }) => {
   // A participant needs one task-first surface, with conversation and people as stable secondary destinations.
   const [sidebarTab, setSidebarTab] = React.useState<SidebarTab>(isMobile ? 'activity' : 'conversation');
-  const [audioUnlocked, setAudioUnlocked] = React.useState(() => {
-    // Persist across re-renders within the same browser tab session
-    try { return sessionStorage.getItem('mf_audio_unlocked') === '1'; } catch { return false; }
-  });
+  // A browser reload creates a new AudioContext. Do not restore a past gesture
+  // from storage and falsely expose replay as ready; each document confirms its
+  // own user gesture before scheduled facilitator audio may play.
+  const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+  const [audioUnlockState, setAudioUnlockState] = React.useState<'idle' | 'enabling' | 'failed'>('idle');
+  const mobileActivityScrollRef = React.useRef<HTMLElement | null>(null);
   const [localCameraStream, setLocalCameraStream] = React.useState<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = React.useState<'off' | 'starting' | 'on' | 'blocked' | 'unsupported'>('off');
   const [microphoneEnabled, setMicrophoneEnabled] = React.useState(false);
@@ -498,11 +500,19 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
     ttsEndpoint: `${import.meta.env.VITE_API_URL ?? ''}/api/tts/synthesize`,
   });
   const handleEnableFacilitatorAudio = React.useCallback(() => {
-    void voiceRuntime.unlockAudio().finally(() => {
-      try { sessionStorage.setItem('mf_audio_unlocked', '1'); } catch { /* ignore */ }
-      setAudioUnlocked(true);
-    });
-  }, [voiceRuntime]);
+    if (audioUnlocked || audioUnlockState === 'enabling') return;
+    setAudioUnlockState('enabling');
+    void voiceRuntime.unlockAudio()
+      .then((didUnlock) => {
+        if (didUnlock) {
+          setAudioUnlocked(true);
+          setAudioUnlockState('idle');
+          return;
+        }
+        setAudioUnlockState('failed');
+      })
+      .catch(() => setAudioUnlockState('failed'));
+  }, [audioUnlockState, audioUnlocked, voiceRuntime]);
 
   const runtimeAvatarState = voiceRuntime.isSpeaking
     ? voiceRuntime.runtimeAvatarState
@@ -1290,7 +1300,14 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
   };
 
   const isAudioPlaybackBusy = voiceRuntime.playbackState === 'preparing' || voiceRuntime.playbackState === 'playing';
-  const hasPassiveAudioReadyState = audioUnlocked && voiceRuntime.playbackState === 'idle' && Boolean(lastAssistantMessage);
+
+  React.useEffect(() => {
+    if (!isMobile || sidebarTab !== 'activity') return;
+    const frame = window.requestAnimationFrame(() => {
+      mobileActivityScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeMode?.id, isMobile, sidebarTab]);
 
   const renderMobileActivityPanel = () => {
     const activityPrompt = toParticipantDisplayText(
@@ -1313,7 +1330,7 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               : activityModeLabel;
 
     return (
-      <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2" aria-label="Current activity">
+      <section ref={mobileActivityScrollRef} className="min-h-0 flex-1 scroll-pt-2 overflow-y-auto overscroll-contain p-2 pb-4" aria-label="Current activity">
         <div className="session-soft-panel rounded-[1.5rem] border border-indigo-100 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-800">
@@ -1331,13 +1348,13 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
             </p>
           )}
           {ttsAvatarEnabled && !audioUnlocked && (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5" role="status">
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5" role="status" aria-live="polite">
               <div className="min-w-0">
-                <p className="text-xs font-bold text-indigo-950">Hear facilitator responses</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-indigo-800">Tap once to enable sound on this phone.</p>
+                <p className="text-xs font-bold text-indigo-950">{audioUnlockState === 'enabling' ? 'Enabling sound…' : audioUnlockState === 'failed' ? 'Sound needs a browser tap' : 'Hear facilitator responses'}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-indigo-800">{audioUnlockState === 'enabling' ? 'Preparing audio on this phone.' : audioUnlockState === 'failed' ? 'Tap Enable sound again while this page is open.' : 'Tap once to enable sound on this phone.'}</p>
               </div>
-              <button type="button" onClick={handleEnableFacilitatorAudio} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95">
-                <Volume2 className="h-4 w-4" /> Enable sound
+              <button type="button" onClick={handleEnableFacilitatorAudio} disabled={audioUnlockState === 'enabling'} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 disabled:cursor-wait disabled:opacity-70">
+                {audioUnlockState === 'enabling' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />} {audioUnlockState === 'enabling' ? 'Enabling…' : 'Enable sound'}
               </button>
             </div>
           )}
@@ -1352,9 +1369,9 @@ const ParticipantMessagingView: React.FC<ParticipantMessagingViewProps> = ({
               </button>
             </div>
           )}
-          {hasPassiveAudioReadyState && ttsAvatarEnabled && (
-            <button type="button" onClick={replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-bold text-indigo-800 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60">
-              <Play className="h-3.5 w-3.5 fill-current" /> {isAudioPlaybackBusy ? 'Preparing sound…' : 'Play facilitator response'}
+          {ttsAvatarEnabled && audioUnlocked && lastAssistantMessage && (
+            <button type="button" onClick={replayLatestFacilitatorReply} disabled={isAudioPlaybackBusy} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-bold text-indigo-800 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60" aria-live="polite">
+              {voiceRuntime.playbackState === 'preparing' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : voiceRuntime.playbackState === 'playing' ? <Volume2 className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 fill-current" />} {voiceRuntime.playbackState === 'preparing' ? 'Preparing facilitator response…' : voiceRuntime.playbackState === 'playing' ? 'Facilitator is speaking' : 'Play facilitator response'}
             </button>
           )}
         </div>

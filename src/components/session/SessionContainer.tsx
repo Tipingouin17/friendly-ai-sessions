@@ -129,9 +129,10 @@ const SessionContainer: React.FC<SessionContainerProps> = ({
   const attendeeCapacity = Math.max(1, participantCount - 1);
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Main content area - admin header is now handled by AdminDashboard */}
-      <div className={`flex-1 overflow-hidden ${!isAdmin && 'pt-2'}`}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50">
+      {/* The participant route owns the fixed-header safe-area offset. Keep this
+          container neutral so nested mobile panels cannot drift under the header. */}
+      <div className="min-h-0 flex-1 overflow-hidden">
         <MessagingArea
           messages={messages}
           participantColors={enhancedParticipantColors}

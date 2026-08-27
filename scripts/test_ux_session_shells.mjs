@@ -160,7 +160,9 @@ assertContains(participantView, 'Hear facilitator responses', 'participant expla
 assertContains(participantView, 'Enable sound', 'participant exposes a provider-neutral mobile sound-enable action');
 assertNotContains(participantView, 'Enable ElevenLabs audio', 'participant production surface does not expose provider implementation branding');
 assertContains(participantView, 'Play latest reply', 'participant exposes a visible replay action for facilitator audio');
-assertContains(participantView, 'hasPassiveAudioReadyState', 'participant identifies passive audio-ready state separately from active audio errors');
+assertContains(participantView, "const [audioUnlocked, setAudioUnlocked] = React.useState(false);", 'participant requires document-scoped audio consent after every reload');
+assertContains(participantView, "audioUnlockState === 'enabling' ? 'Enabling sound…'", 'participant gives immediate visible feedback while sound consent is being established');
+assertNotContains(participantView, 'mf_audio_unlocked', 'participant never restores a stale audio-consent flag across a new document');
 assertContains(participantView, 'className={`hidden shrink-0 border-b px-3 py-2.5 md:block ${', 'detailed passive audio status remains desktop-only and does not displace the mobile task viewport');
 assertContains(participantView, 'Tap once to enable sound on this phone.', 'the phone-only Activity consent explains the required browser gesture concisely');
 assertContains(participantView, 'Play facilitator response', 'Activity retains a compact replay action when passive audio status is hidden on a phone');

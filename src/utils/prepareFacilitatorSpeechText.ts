@@ -137,8 +137,11 @@ function splitLongSentences(text: string): string {
     }
     // Split at clause boundaries: commas, semicolons, em-dashes, "and", "but", "so", "because"
     const clauses = sentence
-      .split(/(?<=[,;—])\s+|(?<=\s)(and|but|so|because|however|although|while|since|when|if)\s+/gi)
-      .map(c => c.trim())
+      // The conjunction is a delimiter, not a spoken clause. A capturing group
+      // here injects undefined entries when it does not participate, which can
+      // crash participant playback for long live-facilitation prompts.
+      .split(/(?<=[,;—])\s+|(?<=\s)(?:and|but|so|because|however|although|while|since|when|if)\s+/gi)
+      .map((clause) => clause.trim())
       .filter(Boolean);
 
     if (clauses.length > 1) {

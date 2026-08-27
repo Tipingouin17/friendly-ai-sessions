@@ -34,6 +34,9 @@ const joinSessionData = read('src/hooks/useJoinSessionData.ts');
 const joinSessionContainer = read('src/components/session/JoinSessionContainer.tsx');
 const participantJoining = read('src/hooks/session-joining/useParticipantJoining.ts');
 const inputValidation = read('src/utils/inputValidation.ts');
+const speechText = read('src/utils/prepareFacilitatorSpeechText.ts');
+const participantSessionPage = read('src/pages/Session.tsx');
+const participantMobileNav = read('src/components/session/SessionMobileNav.tsx');
 
 // Voice and typed turns share one durable message boundary.
 assertContains(chatInput, 'message: finalizedMessage', 'speech final callback exports an explicit finalized message snapshot');
@@ -147,7 +150,7 @@ assertContains(facilitatorVoice, 'playbackGenerationRef.current += 1;', 'cancell
 assertContains(facilitatorVoice, 'if (!isCurrentGeneration()) {', 'server TTS ignores stale async synthesis results');
 assertContains(facilitatorVoice, 'fallbackDisabled: true', 'server TTS failure records that browser fallback is disabled');
 assertNotContains(facilitatorVoice, "fallbackTo: 'browser_speech_synthesis'", 'server-configured TTS never silently falls back to browser speech');
-assertContains(facilitatorVoice, 'ElevenLabs voice is temporarily unavailable.', 'server TTS failures are visible and retryable');
+assertContains(facilitatorVoice, 'Facilitator audio is temporarily unavailable.', 'server TTS failures are visible and retryable without exposing infrastructure');
 assertContains(facilitatorVoice, 'const audioContextRef = React.useRef<AudioContext | null>(null);', 'server voice retains a Web Audio context after the enable gesture');
 assertContains(facilitatorVoice, 'const audioBufferSourceRef = React.useRef<AudioBufferSourceNode | null>(null);', 'server voice can cancel a decoded Android audio source');
 assertContains(facilitatorVoice, 'const getUnlockedAudioContext = React.useCallback', 'server voice obtains the retained user-gesture-resumed context');
@@ -186,6 +189,25 @@ assertContains(participantView, 'className="hidden mt-2 grid grid-cols-2 gap-2 m
 assertContains(inputFooter, 'compactParticipantDock?: boolean;', 'input footer supports the participant phone reply dock without a second composer implementation');
 assertContains(inputFooter, 'taskFirstMobile?: boolean;', 'input footer supports a task-first Activity surface without duplicating mode context');
 assertContains(inputFooter, 'aria-label="Reply composer"', 'compact phone composer remains discoverable to assistive technology');
+
+// A long facilitator prompt must not crash the participant playback path when
+// sentence splitting encounters delimiter-only branches.
+assertContains(speechText, '(?:and|but|so|because|however|although|while|since|when|if)', 'speech clause delimiters are non-capturing');
+assertNotContains(speechText, '(and|but|so|because|however|although|while|since|when|if)', 'speech clause splitting cannot inject undefined capture values');
+assertContains(speechText, '.map((clause) => clause.trim())', 'speech clause mapping receives only actual string clauses');
+
+// A browser reload creates a fresh AudioContext. Consent must be confirmed in
+// the current document, with clear feedback, before replay appears ready.
+assertContains(participantView, "const [audioUnlocked, setAudioUnlocked] = React.useState(false);", 'mobile sound consent starts locked for each document');
+assertNotContains(participantView, 'mf_audio_unlocked', 'mobile sound consent is never incorrectly restored from prior document storage');
+assertContains(participantView, "const [audioUnlockState, setAudioUnlockState] = React.useState<'idle' | 'enabling' | 'failed'>('idle');", 'mobile sound consent exposes an explicit enabling and retry state');
+assertContains(participantView, "audioUnlockState === 'enabling' ? 'Enabling sound…'", 'mobile sound consent gives immediate visible progress feedback');
+assertContains(participantView, "voiceRuntime.playbackState === 'playing' ? 'Facilitator is speaking'", 'mobile replay stays visibly informative while the facilitator is speaking');
+assertContains(participantView, 'mobileActivityScrollRef.current?.scrollTo({ top: 0, behavior: \'auto\' });', 'Activity selection resets its own scroll position before showing the current task');
+assertContains(participantView, 'ref={mobileActivityScrollRef}', 'Activity has an explicit scroll owner for mobile reset');
+assertContains(participantSessionPage, 'pt-[calc(3rem+env(safe-area-inset-top))]', 'participant route offsets active content for the fixed mobile header and safe area');
+assertContains(participantMobileNav, 'h-[calc(3rem+env(safe-area-inset-top))]', 'fixed participant header uses the matching safe-area-aware height');
+assertContains(sessionContainer, 'The participant route owns the fixed-header safe-area offset.', 'nested session container no longer adds competing participant top padding');
 
 // A full room may become ready, but only the host may call the atomic start endpoint.
 assertNotContains(autoStartSession, 'await onStartSession()', 'legacy auto-start hook cannot call the host start operation');

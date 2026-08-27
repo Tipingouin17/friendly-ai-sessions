@@ -61,13 +61,15 @@ const Session = () => {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh]">
-      {/* Mobile navigation container - always present for consistent DOM structure */}
+    <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden">
+      {/* The participant header is fixed. Keep its safe-area-aware height and this
+          content offset in one explicit contract so mobile activity scroll never
+          travels underneath it. */}
       <div className={`${showMobileNav ? 'block' : 'hidden'}`}>
         <SessionMobileNav />
       </div>
 
-      <div className={`flex-1 overflow-hidden ${showMobileNav ? 'pt-12 sm:pt-16' : ''}`}>
+      <div className={`min-h-0 flex-1 overflow-hidden ${showMobileNav ? 'pt-[calc(3rem+env(safe-area-inset-top))] sm:pt-16' : ''}`}>
         <SessionContent
           isLoading={isLoading}
           hasInitializedProvider={hasInitializedProvider}

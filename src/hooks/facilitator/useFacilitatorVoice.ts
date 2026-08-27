@@ -500,7 +500,7 @@ export function useFacilitatorVoice({
       setIsSpeaking(false);
       setAvatarState('error');
       setPlaybackState('failed');
-      setPlaybackError('ElevenLabs voice is temporarily unavailable. Tap Play latest reply to retry.');
+      setPlaybackError('Facilitator audio is temporarily unavailable. Tap Play facilitator response to retry.');
       void updateTtsEventStatus(activeEventIdRef.current, 'failed', {
         metadata: { ...personaMetadata, error: serverError, fallbackDisabled: true },
       });
@@ -541,7 +541,7 @@ export function useFacilitatorVoice({
       setIsSpeaking(false);
       setAvatarState('error');
       setPlaybackState('failed');
-      setPlaybackError('The ElevenLabs voice could not be played on this device.');
+      setPlaybackError('Facilitator audio could not be played on this device.');
       audioBufferSourceRef.current = null;
       audioElementRef.current = null;
       _revokeAudioUrl();

@@ -15,7 +15,7 @@ const SessionMobileNav = () => {
   const { isAuthenticated, user, logout } = useAuth();
   
   return (
-    <div className="fixed left-0 right-0 top-0 z-50 flex h-12 items-center justify-between border-b border-slate-100 bg-white px-3 py-2 shadow-sm sm:h-16 sm:p-4">
+    <div className="fixed left-0 right-0 top-0 z-50 flex h-[calc(3rem+env(safe-area-inset-top))] items-end justify-between border-b border-slate-100 bg-white px-3 pb-2 pt-[env(safe-area-inset-top)] shadow-sm sm:h-16 sm:items-center sm:p-4">
       <Link to="/" className="flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600">
           <Sparkles className="h-3.5 w-3.5 text-white" />

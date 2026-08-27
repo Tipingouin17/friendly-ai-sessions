@@ -364,7 +364,7 @@ export function clearParticipantSessionData(): void {
 
 // ─── HTTP helper ──────────────────────────────────────────────────────────────
 
-function getParticipantScopedConversationId(path: string, body: RequestInit['body'] | undefined): string | null {
+function getParticipantMutationConversationId(path: string, body: RequestInit['body'] | undefined): string | null {
   if (typeof body !== 'string') return null;
   try {
     const payload = JSON.parse(body) as {
@@ -385,6 +385,32 @@ function getParticipantScopedConversationId(path: string, body: RequestInit['bod
   }
 }
 
+/**
+ * A participant who has joined before the host starts must be able to read the
+ * durable welcome and transcript once they arrive. GET builders encode the
+ * conversation ID in the PostgREST query rather than a request body, so parse
+ * the exact equality filter and keep the token scoped to that conversation.
+ */
+function getParticipantMessageReadConversationId(path: string): string | null {
+  if (!path.startsWith('/rest/v1/messages')) return null;
+  try {
+    const query = new URL(path, window.location.origin).searchParams;
+    const rawConversationId = query.get('conversation_id');
+    const conversationId = rawConversationId?.match(/^eq\.([0-9]+)$/)?.[1];
+    return conversationId && Number.isFinite(Number(conversationId)) ? conversationId : null;
+  } catch {
+    return null;
+  }
+}
+
+function isParticipantRoute(): boolean {
+  try {
+    return !window.location.pathname.startsWith('/session/host');
+  } catch {
+    return false;
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit & { headers?: Record<string, string>; timeoutMs?: number } = {}
@@ -392,10 +418,12 @@ async function apiFetch<T>(
   try {
     const { timeoutMs = 15_000, ...fetchOptions } = options;
     const token = getToken();
-    // A participant message or WebRTC signal may execute from a browser that
-    // also has a saved app login. Resolve the token from the payload's session
-    // rather than the current URL, which can change during session navigation.
-    const participantScopedConversationId = getParticipantScopedConversationId(path, options.body);
+    // Participant writes carry their conversation ID in the request body; the
+    // durable message read that follows host start carries it in the query.
+    // Resolve both forms without ever borrowing a token from another session.
+    const participantMutationConversationId = getParticipantMutationConversationId(path, options.body);
+    const participantReadConversationId = getParticipantMessageReadConversationId(path);
+    const participantScopedConversationId = participantMutationConversationId ?? participantReadConversationId;
     const joinToken = getJoinToken(participantScopedConversationId);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -403,11 +431,13 @@ async function apiFetch<T>(
       ...(options.headers ?? {}),
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    // Normal authenticated navigation remains ownership-scoped. The one
-    // exception is an ordinary participant message: its session-bound join
-    // token is the authoritative permission, even when this browser happens
-    // to retain a separate saved app login from earlier testing.
-    if (joinToken && (!token || participantScopedConversationId)) {
+    // Normal authenticated host navigation remains ownership-scoped. On a
+    // participant route, the scoped join token is authoritative for ordinary
+    // participant writes *and* the durable /messages read that follows a host
+    // start, even when the browser retains a separate saved app login.
+    const joinTokenIsAuthoritative = Boolean(participantMutationConversationId)
+      || (Boolean(participantReadConversationId) && isParticipantRoute());
+    if (joinToken && (!token || joinTokenIsAuthoritative)) {
       headers["X-Join-Token"] = joinToken;
     }
 

@@ -38,6 +38,7 @@ const inputValidation = read('src/utils/inputValidation.ts');
 const speechText = read('src/utils/prepareFacilitatorSpeechText.ts');
 const participantSessionPage = read('src/pages/Session.tsx');
 const participantMobileNav = read('src/components/session/SessionMobileNav.tsx');
+const apiClient = read('src/lib/api.ts');
 
 // Voice and typed turns share one durable message boundary.
 assertContains(chatInput, 'message: finalizedMessage', 'speech final callback exports an explicit finalized message snapshot');
@@ -143,6 +144,12 @@ assertContains(fastApiServer, 'if not await _validate_join_token(join_token_head
 assertNotContains(fastApiServer, 'IMPORTANT: Always acquires its own connection from the pool', 'join-token validator no longer documents unsafe nested acquisition');
 assertContains(fastApiServer, 'The budget applies only while waiting for a pool slot.', 'interactive reads and messages bound acquisition without cancelling owned work');
 assertContains(fastApiServer, '_pool_pressure_snapshot()', 'pool-pressure diagnostics are retained for future operational triage');
+assertContains(apiClient, 'function getParticipantMessageReadConversationId(path: string): string | null', 'participant durable message reads have an explicit query-scoped conversation resolver');
+assertContains(apiClient, "const rawConversationId = query.get('conversation_id');", 'participant durable message reads parse their exact PostgREST conversation filter');
+assertContains(apiClient, "rawConversationId?.match(/^eq\\.([0-9]+)$/)?.[1]", 'participant durable message reads accept only an exact numeric equality scope');
+assertContains(apiClient, 'const participantReadConversationId = getParticipantMessageReadConversationId(path);', 'API transport resolves participant message reads alongside writes');
+assertContains(apiClient, '(Boolean(participantReadConversationId) && isParticipantRoute())', 'participant routes attach their scoped token to durable message reads after host start');
+assertContains(apiClient, "!window.location.pathname.startsWith('/session/host')", 'host-owned message reads never borrow a participant join token');
 
 // Server-configured participant voice is explicitly ElevenLabs-only: never a
 // hidden browser speech fallback, and stale synthesis work cannot replay.

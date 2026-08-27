@@ -286,9 +286,11 @@ test('participant messages and WebRTC signals retain conversation-scoped join-to
   const saver = readFileSync(resolve(repoRoot, 'src/hooks/messageSender/useMessageSaver.ts'), 'utf8');
   const webrtc = readFileSync(resolve(repoRoot, 'src/hooks/useWebRTCSession.ts'), 'utf8');
 
-  assert.match(api, /getParticipantScopedConversationId/);
+  assert.match(api, /getParticipantMutationConversationId/);
+  assert.match(api, /getParticipantMessageReadConversationId/);
   assert.match(api, /isParticipantMessage/);
   assert.match(api, /isWebRtcSignal/);
+  assert.match(api, /conversation_id/);
   assert.match(api, /X-Join-Token/);
   assert.match(server, /participant_webrtc_signal/);
   assert.match(server, /signal_data\.get\("kind"\) == "webrtc_signal"/);

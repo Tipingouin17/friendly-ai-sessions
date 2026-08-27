@@ -146,6 +146,23 @@ export function useParticipantJoining() {
 
     const newParticipantId: number = data.participant_id;
 
+    // The participant transitions to `/session?id=…` after this point, which
+    // intentionally removes the token from the visible URL. Re-persist the
+    // already-validated QR token at the successful join boundary so mobile
+    // Safari cannot retain a participant identity while losing the scoped
+    // credential required by durable message reads after the host starts.
+    // The key is conversation-scoped and is never used for another room.
+    if (joinToken) {
+      try {
+        setJoinToken(joinToken, String(conversationId));
+      } catch (error) {
+        // The existing participant-data persistence below will surface a
+        // storage failure through its normal recovery path. Do not convert a
+        // completed server-side join into an opaque client crash.
+        console.warn('Failed to persist scoped participant join token:', error);
+      }
+    }
+
     // Persist participant data to localStorage for rejoin detection.
     // The deviceId is stored alongside so handleExistingParticipant can
     // verify the returning browser is the same one that originally joined.
